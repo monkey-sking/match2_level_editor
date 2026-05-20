@@ -1,0 +1,6 @@
+{
+  "name": "match2_level_editor",
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Analyze Templates</title>
+</head>
+<body>
+<h1>Analyze Templates</h1>
+<div id="result" style="white-space: pre-wrap; font-family: monospace; font-size: 14px;"></div>
+<script>
+async function run() {
+  const resultDiv = document.getElementById('result');
+  try {
+    const res = await fetch('BoardTemplates.json');
+    const templates = await res.json();
+    let totalTemplates = 0;
+    let outOfBoundsCount = 0;
+    let parityViolationsCount = 0;
+    let overlapCount = 0;
+    let details = '';
+
+    for (const [name, tiles] of Object.entries(templates)) {
+      totalTemplates++;
+      let hasOutOfBounds = false;
+      let hasParityViolation = false;
+      let hasOverlap = false;
+
+      // Check bounds
+      for (const t of tiles) {
+        if (t.x < 0 || t.x > 10 || t.y < 0 || t.y > 12) {
+          hasOutOfBounds = true;
+        }
+      }
+
+      // Check parity (Disabled: same layer can contain mixed parities)
+      hasParityViolation = false;
+
+      // Check overlaps
+      for (let i = 0; i < tiles.length; i++) {
+        for (let j = i + 1; j < tiles.length; j++) {
+          if (tiles[i].layout === tiles[j].layout) {
+            const dx = Math.abs(tiles[i].x - tiles[j].x);
+            const dy = Math.abs(tiles[i].y - tiles[j].y);
+            if (dx < 2 && dy < 2) {
+              hasOverlap = true;
+            }
+          }
+        }
+      }
+
+      if (hasOutOfBounds || hasParityViolation || hasOverlap) {
+        if (hasOutOfBounds) outOfBoundsCount++;
+        if (hasParityViolation) parityViolationsCount++;
+        if (hasOverlap) overlapCount++;
+
+        details += `- **${name}**: `;
+        const errors = [];
+        if (hasOutOfBounds) errors.push('Out of bounds (x: 0..10, y: 0..12)');
+        if (hasParityViolation) errors.push('Parity violation');
+        if (hasOverlap) errors.push('Same-layer overlap');
+        details += errors.join(', ') + '\n';
+      }
+    }
+
+    let summary = `Total templates analyzed: ${totalTemplates}\n`;
+    summary += `Templates with out of bounds: ${outOfBoundsCount}\n`;
+    summary += `Templates with parity violations: ${parityViolationsCount}\n`;
+    summary += `Templates with overlaps: ${overlapCount}\n\n`;
+    summary += `Detailed violations list:\n` + details;
+
+    resultDiv.textContent = summary;
+  } catch (err) {
+    resultDiv.textContent = 'Error: ' + err.message;
+  }
+}
+run();
+</script>
+</body>
+</html>

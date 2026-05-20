@@ -1,0 +1,2550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Match-2 二消关卡排版编辑器</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-dark: #121214;
+    --card-bg: #1e1e24;
+    --border-color: #32323e;
+    --accent: #ffd32a;
+    --accent-hover: #ffc000;
+    --text-main: #f5f5f7;
+    --text-muted: #8e8e9f;
+    --success: #0be881;
+    --warning: #ffd32a;
+    --danger: #ff3f34;
+    
+    /* Layer colors */
+    --color-l1: #808e9b;
+    --color-l2: #4bcffa;
+    --color-l3: #0be881;
+    --color-l4: #ffd32a;
+    --color-l5: #ff3f34;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    padding: 30px;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 20px;
+  }
+
+  h1 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #ffd32a, #ff3f34);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 30px;
+    flex-grow: 1;
+  }
+
+  .card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .workspace-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  /* Grid Editor styles */
+  .editor-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-grow: 1;
+    background: #0d0d0f;
+    border-radius: 8px;
+    padding: 20px;
+    border: 1px dashed var(--border-color);
+    position: relative;
+    min-height: 600px;
+  }
+
+  /* 12 cols x 14 rows grid (allows 2x2 tiles at x=10 and y=0 to display fully) */
+  .grid-board {
+    display: grid;
+    grid-template-columns: repeat(12, 40px);
+    grid-template-rows: repeat(14, 40px);
+    gap: 1px;
+    background-color: #222;
+    border: 3px solid #444;
+    border-radius: 6px;
+    position: relative;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  }
+
+  .grid-cell {
+    background-color: #151518;
+    position: relative;
+    cursor: crosshair;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    color: #444;
+    user-select: none;
+    transition: background-color 0.2s;
+  }
+
+  .grid-cell.even-even {
+    background-color: #1a1a20;
+  }
+
+  .grid-cell:hover {
+    background-color: #2a2a35;
+  }
+
+  /* Axis labels */
+  .axis-label {
+    position: absolute;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  /* Tiles rendered on the board */
+  .board-tile {
+    position: absolute;
+    width: 78px; /* 2 cells wide (2*40 + 1px border - 3px padding) */
+    height: 78px; /* 2 cells high */
+    border: 2px solid #000;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: bold;
+    color: #000;
+    box-shadow: 2px 4px 8px rgba(0,0,0,0.7);
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    user-select: none;
+  }
+
+  .board-tile:hover {
+    transform: scale(1.03);
+    box-shadow: 3px 6px 12px rgba(0,0,0,0.8);
+  }
+
+  .board-tile.selected {
+    border-color: var(--accent);
+    outline: 2px solid var(--accent);
+  }
+
+  /* Floating tile indicators and warning badge */
+  .board-tile.floating-tile {
+    border: 2px dashed #ff3f34 !important;
+    animation: pulse-border 1.5s infinite alternate;
+  }
+
+  @keyframes pulse-border {
+    0% {
+      box-shadow: 0 0 4px rgba(255, 63, 52, 0.4);
+    }
+    100% {
+      box-shadow: 0 0 12px rgba(255, 63, 52, 0.8);
+    }
+  }
+
+  .floating-warning-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    background-color: #ff3f34;
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: 800;
+    pointer-events: none;
+    line-height: 1;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  /* Ghost/placement outline preview */
+  .placement-ghost {
+    position: absolute;
+    width: 78px;
+    height: 78px;
+    border: 2px dashed var(--accent);
+    border-radius: 6px;
+    background-color: rgba(255, 211, 42, 0.15);
+    pointer-events: none;
+    z-index: 999;
+    display: none;
+  }
+
+  /* Sidebar Controls */
+  .control-group {
+    margin-bottom: 24px;
+  }
+
+  .control-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .btn {
+    background-color: #2b2b36;
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn:hover {
+    background-color: #383847;
+    border-color: #4a4a5e;
+  }
+
+  .btn-accent {
+    background-color: var(--accent);
+    color: #121214;
+    border: none;
+  }
+
+  .btn-accent:hover {
+    background-color: var(--accent-hover);
+  }
+
+  .btn-danger {
+    background-color: rgba(255, 63, 52, 0.15);
+    color: var(--danger);
+    border-color: rgba(255, 63, 52, 0.3);
+  }
+
+  .btn-danger:hover {
+    background-color: rgba(255, 63, 52, 0.25);
+  }
+
+  .btn-view.active, .btn-scope.active {
+    background-color: var(--accent) !important;
+    color: #121214 !important;
+    border-color: var(--accent) !important;
+  }
+
+  /* Custom Switch Styles for Toggle */
+  .switch {
+    position: relative;
+    display: inline-block;
+    width: 38px;
+    height: 20px;
+  }
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #23232c;
+    transition: 0.2s;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+  }
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-muted);
+    transition: 0.2s;
+    border-radius: 50%;
+  }
+  .switch input:checked + .slider {
+    background-color: var(--accent) !important;
+  }
+  .switch input:checked + .slider:before {
+    transform: translateX(18px);
+    background-color: #121214;
+  }
+
+  /* Layer buttons */
+  .layer-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .layer-btn {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 1px solid var(--border-color);
+    background-color: #23232c;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  .layer-btn:hover {
+    background-color: #2c2c38;
+  }
+
+  .layer-btn.active {
+    border-color: var(--active-color);
+    box-shadow: 0 0 10px rgba(var(--active-rgb), 0.3);
+  }
+
+  .layer-badge {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  /* Dropdown styling */
+  select {
+    width: 100%;
+    background-color: #23232c;
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+  }
+  select option {
+    background-color: #23232c;
+    color: var(--text-main);
+  }
+
+  /* Stats display */
+  .stat-card {
+    background-color: #17171c;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+
+  .stat-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .stat-val {
+    font-weight: 700;
+  }
+
+  .status-badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+  }
+
+  .status-pass {
+    background-color: rgba(11, 232, 129, 0.15);
+    color: var(--success);
+  }
+
+  .status-warn {
+    background-color: rgba(255, 211, 42, 0.15);
+    color: var(--warning);
+  }
+
+  .status-fail {
+    background-color: rgba(255, 63, 52, 0.15);
+    color: var(--danger);
+  }
+
+  /* Output modal/textbox */
+  textarea {
+    width: 100%;
+    height: 120px;
+    background-color: #0f0f12;
+    border: 1px solid var(--border-color);
+    color: #a6e22e;
+    font-family: monospace;
+    padding: 12px;
+    border-radius: 8px;
+    resize: none;
+    font-size: 12px;
+    margin-top: 10px;
+  }
+
+  /* Notification Toast */
+  #toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background-color: #2f3640;
+    color: #fff;
+    padding: 16px 24px;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transform: translateY(150%);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 9999;
+  }
+
+  #toast.show {
+    transform: translateY(0);
+  }
+
+  #toast.success {
+    border-left: 4px solid var(--success);
+  }
+
+  #toast.error {
+    border-left: 4px solid var(--danger);
+  }
+
+  /* ==========================================================================
+     MODERN THEME / IDE LAYOUT OVERRIDES
+     ========================================================================== */
+
+  /* Class visibility modifiers */
+  body:not(.theme-modern) .modern-only {
+    display: none !important;
+  }
+  
+  body.theme-modern .classic-only {
+    display: none !important;
+  }
+
+  /* Modern Background Gradient */
+  body.theme-modern {
+    background: radial-gradient(circle at top right, #1a1a24 0%, #0c0c0e 100%);
+    background-attachment: fixed;
+  }
+
+  /* Modern 3-Column Grid Layout */
+  body.theme-modern .main-layout {
+    display: grid;
+    grid-template-columns: 280px 1fr 340px !important;
+    gap: 20px !important;
+    height: calc(100vh - 140px);
+    min-height: 720px;
+    align-items: stretch;
+  }
+
+  @media (max-width: 1300px) {
+    body.theme-modern .main-layout {
+      grid-template-columns: 240px 1fr 300px !important;
+    }
+  }
+
+  /* Glassmorphism Cards */
+  body.theme-modern .card {
+    background: rgba(30, 30, 38, 0.45) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6) !important;
+    padding: 20px !important;
+  }
+
+  /* Scrollable Inspector Sidebar */
+  body.theme-modern .inspector-sidebar {
+    height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding-right: 8px !important;
+  }
+  
+  body.theme-modern .inspector-sidebar::-webkit-scrollbar {
+    width: 5px;
+  }
+  body.theme-modern .inspector-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  body.theme-modern .inspector-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+  }
+  body.theme-modern .inspector-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.12);
+  }
+
+  /* Workspace relative for floating toolbar positioning */
+  body.theme-modern .canvas-workspace {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body.theme-modern .editor-container {
+    background: #08080a !important;
+    border: 1px solid rgba(255, 255, 255, 0.03) !important;
+    border-radius: 8px;
+    position: relative;
+    padding-top: 60px !important; /* Space for the floating toolbar overlay */
+    box-shadow: inset 0 2px 10px rgba(0,0,0,0.8);
+  }
+
+  /* Ambient glowing backdrop on board corresponding to active layer */
+  body.theme-modern .grid-board {
+    box-shadow: 0 15px 45px rgba(0, 0, 0, 0.8), 
+                0 0 30px var(--layer-glow-color, rgba(128, 142, 155, 0.25)) !important;
+    transition: box-shadow 0.4s cubic-bezier(0.165, 0.84, 0.44, 1) !important;
+    border-color: #2e2e3a !important;
+  }
+
+  /* Explorer list inside Left Sidebar */
+  .explorer-dock {
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .explorer-search-box {
+    margin-bottom: 12px;
+  }
+  
+  .explorer-search-box input {
+    width: 100%;
+    background-color: rgba(0,0,0,0.3);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  
+  .explorer-search-box input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 5px rgba(255, 211, 42, 0.2);
+  }
+  
+  .explorer-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 4px;
+  }
+  
+  /* Custom scrollbar for explorer list */
+  .explorer-list::-webkit-scrollbar {
+    width: 5px;
+  }
+  .explorer-list::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .explorer-list::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+  }
+  .explorer-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.12);
+  }
+  
+  .explorer-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255, 255, 255, 0.02);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  
+  .explorer-item:hover {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.1);
+  }
+  
+  .explorer-item.active {
+    background: rgba(255, 211, 42, 0.08);
+    border-color: var(--accent);
+    box-shadow: 0 0 8px rgba(255, 211, 42, 0.1);
+  }
+  
+  .explorer-item-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-main);
+  }
+  
+  .explorer-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .explorer-item-count {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  
+  .explorer-item-status {
+    font-size: 10px;
+    font-weight: bold;
+    padding: 1px 4px;
+    border-radius: 4px;
+  }
+
+  /* Floating Toolbar styles overlaying board */
+  .floating-toolbar {
+    position: absolute;
+    top: 35px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+    background: rgba(24, 24, 30, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 30px;
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    white-space: nowrap !important;
+    flex-wrap: nowrap !important;
+  }
+  
+  .toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+  
+  .toolbar-section-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 800;
+    margin-right: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .toolbar-divider {
+    width: 1px;
+    height: 16px;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .btn-sm {
+    padding: 5px 10px !important;
+    font-size: 11px !important;
+    border-radius: 15px !important;
+    height: auto !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+  
+  .toolbar-toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-main);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+  
+  /* Small switch container */
+  .switch-container {
+    position: relative;
+    display: inline-block;
+    width: 28px;
+    height: 16px;
+  }
+  
+  .switch-container input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  
+  .slider-sm {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0,0,0,0.4);
+    transition: 0.2s;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+  }
+  
+  .slider-sm:before {
+    position: absolute;
+    content: "";
+    height: 10px;
+    width: 10px;
+    left: 2px;
+    bottom: 2px;
+    background-color: var(--text-muted);
+    transition: 0.2s;
+    border-radius: 50%;
+  }
+  
+  .switch-container input:checked + .slider-sm {
+    background-color: var(--accent) !important;
+  }
+  
+  .switch-container input:checked + .slider-sm:before {
+    transform: translateX(12px);
+    background-color: #121214;
+  }
+
+  /* Workspace Bottom Status Bar */
+  .workspace-footer {
+    display: flex;
+    justify-content: space-around;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 15px;
+  }
+  
+  .footer-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  
+  .footer-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: bold;
+    letter-spacing: 0.5px;
+  }
+  
+  .footer-val {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  /* Circular Joystick D-pad */
+  body.theme-modern .shift-grid {
+    position: relative;
+    width: 110px;
+    height: 110px;
+    background: radial-gradient(circle, rgba(30, 30, 38, 0.9) 0%, rgba(18, 18, 20, 0.95) 70%);
+    border: 2px solid var(--border-color);
+    border-radius: 50%;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5), inset 0 2px 5px rgba(255,255,255,0.05);
+    display: block !important; /* Override standard grid display */
+    margin: 15px auto !important;
+  }
+
+  body.theme-modern .shift-grid button {
+    position: absolute;
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    transition: all 0.2s;
+  }
+
+  body.theme-modern .shift-grid button:hover {
+    background: var(--accent) !important;
+    color: #121214 !important;
+    box-shadow: 0 0 10px var(--accent) !important;
+    border-color: var(--accent) !important;
+  }
+
+  body.theme-modern .shift-grid .btn-shift-up {
+    top: 4px;
+    left: calc(50% - 15px);
+  }
+
+  body.theme-modern .shift-grid .btn-shift-down {
+    bottom: 4px;
+    left: calc(50% - 15px);
+  }
+
+  body.theme-modern .shift-grid .btn-shift-left {
+    left: 4px;
+    top: calc(50% - 15px);
+  }
+
+  body.theme-modern .shift-grid .btn-shift-right {
+    right: 4px;
+    top: calc(50% - 15px);
+  }
+
+  body.theme-modern .shift-grid #shiftScopeLabel {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11px;
+  }
+
+  body.theme-modern .shift-grid > div:not(#shiftScopeLabel) {
+    display: none !important;
+  }
+
+  /* Redesigned layer button with density progress bar */
+  body.theme-modern .layer-btn {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+  .layer-btn-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+  body.theme-modern .layer-density-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  body.theme-modern .layer-density-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+
+  /* Redesigned validation dashboard stat rows */
+  body.theme-modern .stat-card {
+    background: transparent;
+    border: none;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  body.theme-modern .stat-row {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 8px 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-bottom: 0;
+  }
+  body.theme-modern .stat-row span:first-child {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  body.theme-modern .stat-val {
+    font-size: 15px;
+    font-family: 'Outfit', sans-serif;
+    color: var(--accent);
+  }
+  body.theme-modern .status-badge {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    width: 100%;
+    text-align: center;
+    display: block;
+  }
+
+  /* Collapsible console styling */
+  body.theme-modern .btn-collapsible {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-main);
+    transition: all 0.2s;
+  }
+  body.theme-modern .btn-collapsible:hover {
+    background: rgba(255,255,255,0.08);
+  }
+  body.theme-modern #exportConsoleContent {
+    display: none; /* Collapsed by default in modern layout */
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 class="classic-only">Match-2 Level Layout Editor</h1>
+    <h1 class="modern-only" style="background: linear-gradient(135deg, var(--accent), #ffd32a); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🧩 Match-2 Level Editor IDE</h1>
+    <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">编辑并生成完全合规的 $11 \times 13$ 叠牌网格关卡模板</p>
+  </div>
+  <div style="display: flex; gap: 10px; align-items: center;">
+    <button class="btn" id="themeToggleBtn" onclick="toggleTheme()" style="border-color: var(--accent); color: var(--accent); font-weight: 700;">✨ 体验新版布局</button>
+    <button class="btn btn-danger" onclick="clearBoard()">清空画布</button>
+    <button class="btn btn-accent" onclick="saveToTemplates()">保存到 BoardTemplates.json</button>
+  </div>
+</header>
+
+<div class="main-layout">
+  <!-- 1. Left Explorer Sidebar (Modern Only) -->
+  <div class="explorer-dock card modern-only">
+    <div class="workspace-title" style="margin-bottom: 12px; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; flex-direction: column;">
+        <span>关卡浏览器</span>
+        <span style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-top: 2px;">快速加载切换</span>
+      </div>
+      <button class="btn btn-accent" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; font-weight: bold; height: auto; line-height: 1;" onclick="createNewTemplate()">+ 新建关卡</button>
+    </div>
+    <div class="explorer-search-box">
+      <input type="text" id="explorerSearch" placeholder="🔍 快速过滤查找关卡..." oninput="filterExplorerList()">
+    </div>
+    <div class="explorer-list" id="explorerList">
+      <!-- Populated via Javascript -->
+    </div>
+  </div>
+
+  <!-- 2. Workspace Canvas (Shared) -->
+  <div class="canvas-workspace card">
+    <div class="workspace-title classic-only">
+      <span>排版编辑画布</span>
+      <span style="font-size: 13px; color: var(--text-muted);">提示: 点击格子放置，双击或再次点击已放置的牌可删除</span>
+    </div>
+    
+    <div class="workspace-title modern-only" style="margin-bottom: 15px; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800;">
+      <span id="canvasLevelTitle">排版编辑工作台</span>
+      <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">使用网格磁吸，点击左侧或下方即可切换</span>
+    </div>
+    
+    <!-- Floating Toolbar (Modern Only) -->
+    <div class="floating-toolbar modern-only">
+      <div class="toolbar-section">
+        <span class="toolbar-section-label">显示</span>
+        <button class="btn btn-view active btn-sm" id="viewModeAllModern" onclick="setViewMode('all')">显示全部</button>
+        <button class="btn btn-view btn-sm" id="viewModeFocusModern" onclick="setViewMode('focus')">聚焦当前</button>
+        <button class="btn btn-view btn-sm" id="viewModeCurrentModern" onclick="setViewMode('current')">仅看当前</button>
+      </div>
+      
+      <div class="toolbar-divider"></div>
+      
+      <div class="toolbar-section">
+        <label class="toolbar-toggle-label">
+          <span class="switch-container">
+            <input type="checkbox" id="crosshairToggleModern" onchange="toggleCrosshair(this.checked)" checked>
+            <span class="slider-sm"></span>
+          </span>
+          <span>对称十字线</span>
+        </label>
+        
+        <label class="toolbar-toggle-label" id="lowerLayerRefGroupModern" style="display: none;">
+          <span class="switch-container">
+            <input type="checkbox" id="lowerLayerRefToggleModern" onchange="toggleLowerLayerRef(this.checked)">
+            <span class="slider-sm"></span>
+          </span>
+          <span>底支撑参照</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="editor-container">
+      <div class="grid-board" id="gridBoard">
+        <!-- Symmetry Centerlines (z-index: 999 to show on top of all cards, pointer-events: none) -->
+        <div id="crosshair-v" style="position: absolute; left: 245.5px; top: 0; bottom: 0; width: 2px; background: repeating-linear-gradient(to bottom, var(--accent) 0, var(--accent) 6px, transparent 6px, transparent 12px); pointer-events: none; z-index: 999; opacity: 0.85; filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);"></div>
+        <div id="crosshair-h" style="position: absolute; top: 286.5px; left: 0; right: 0; height: 2px; background: repeating-linear-gradient(to right, var(--accent) 0, var(--accent) 6px, transparent 6px, transparent 12px); pointer-events: none; z-index: 999; opacity: 0.85; filter: drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000);"></div>
+        
+        <!-- Cells generated programmatically -->
+        
+        <!-- Hover Ghost outline -->
+        <div class="placement-ghost" id="placementGhost"></div>
+      </div>
+    </div>
+    
+    <!-- Workspace Bottom Status Bar (Modern Only) -->
+    <div class="workspace-footer modern-only">
+      <div class="footer-item">
+        <span class="footer-label">光标网格</span>
+        <span id="footerCoordinates" class="footer-val">-</span>
+      </div>
+      <div class="footer-item">
+        <span class="footer-label">当前层堆叠</span>
+        <span id="footerLayerTilesCount" class="footer-val">0 张</span>
+      </div>
+      <div class="footer-item">
+        <span class="footer-label">可配对对数</span>
+        <span id="footerPairsCount" class="footer-val">0 对</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Inspector Sidebar (Shared) -->
+  <div class="inspector-sidebar card">
+    <div class="workspace-title classic-only">属性与操作面板</div>
+    <div class="workspace-title modern-only" style="margin-bottom: 20px; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800;">检查器与设置</div>
+
+    <!-- Template selector (Classic Only) -->
+    <div class="control-group classic-only">
+      <div class="control-label">加载与切换模板</div>
+      <div style="display: flex; gap: 10px; align-items: stretch; margin-bottom: 8px;">
+        <select id="templateSelector" style="flex: 1; min-width: 0;">
+          <option value="">-- 选择模板 --</option>
+        </select>
+        <button class="btn" style="white-space: nowrap; flex-shrink: 0; padding: 0 12px;" onclick="loadSelectedTemplate()">加载</button>
+        <button class="btn btn-accent" style="white-space: nowrap; flex-shrink: 0; padding: 0 12px;" onclick="createNewTemplate()">+ 新建</button>
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn" style="flex: 1; padding: 8px; font-size: 13px;" onclick="navigateTemplate(-1)" title="切换至上一关模板">◀ 上一关</button>
+        <button class="btn" style="flex: 1; padding: 8px; font-size: 13px;" onclick="navigateTemplate(1)" title="切换至下一关模板">下一关 ▶</button>
+      </div>
+    </div>
+
+    <!-- Layer selector -->
+    <div class="control-group">
+      <div class="control-label">编辑活动图层</div>
+      <div class="layer-selector" id="layerSelector">
+        <!-- Will be populated dynamically from config.json -->
+      </div>
+    </div>
+
+    <!-- View Mode Selector (Classic Only) -->
+    <div class="control-group classic-only">
+      <div class="control-label">视图显示模式</div>
+      <div class="view-mode-selector" style="display: flex; gap: 6px;">
+        <button class="btn btn-view active" id="viewModeAll" onclick="setViewMode('all')" style="flex: 1; padding: 8px; font-size: 12px; font-weight: bold;">显示全部</button>
+        <button class="btn btn-view" id="viewModeFocus" onclick="setViewMode('focus')" style="flex: 1; padding: 8px; font-size: 12px; font-weight: bold;">聚焦当前</button>
+        <button class="btn btn-view" id="viewModeCurrent" onclick="setViewMode('current')" style="flex: 1; padding: 8px; font-size: 12px; font-weight: bold;">仅看当前</button>
+      </div>
+    </div>
+
+    <!-- Show Lower Layer Reference Toggle (Classic Only) -->
+    <div class="control-group classic-only" id="lowerLayerRefGroup" style="display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="control-label" style="margin-bottom: 0;">显示下一层作支撑参照</div>
+        <label class="switch">
+          <input type="checkbox" id="lowerLayerRefToggle" onchange="toggleLowerLayerRef(this.checked)">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Symmetry Crosshair Toggle (Classic Only) -->
+    <div class="control-group classic-only">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="control-label" style="margin-bottom: 0;">显示对称十字中心线</div>
+        <label class="switch">
+          <input type="checkbox" id="crosshairToggle" onchange="toggleCrosshair(this.checked)" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Shift Layout Controls -->
+    <div class="control-group">
+      <div class="control-label">平移布局方向键</div>
+      
+      <!-- Scope selector tabs -->
+      <div class="shift-scope-selector" style="display: flex; gap: 4px; margin-bottom: 10px; background: #17171c; padding: 3px; border-radius: 6px; border: 1px solid var(--border-color);">
+        <button class="btn btn-scope active" id="shiftScopeAll" onclick="setShiftScope('all')" style="flex: 1; padding: 6px; font-size: 11px; font-weight: bold; border: none; background: transparent; color: var(--text-muted); border-radius: 4px; transition: all 0.2s; cursor: pointer;">整体平移</button>
+        <button class="btn btn-scope" id="shiftScopeLayer" onclick="setShiftScope('layer')" style="flex: 1; padding: 6px; font-size: 11px; font-weight: bold; border: none; background: transparent; color: var(--text-muted); border-radius: 4px; transition: all 0.2s; cursor: pointer;">仅当前层</button>
+      </div>
+
+      <div class="shift-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; justify-items: center; align-items: center; max-width: 150px; margin: 0 auto;">
+        <div></div>
+        <button class="btn btn-shift-up" onclick="executeShift(0, -1)" style="padding: 8px; width: 36px; height: 36px; font-size: 14px; font-weight: bold; border-radius: 6px;" title="向上平移">▲</button>
+        <div></div>
+        
+        <button class="btn btn-shift-left" onclick="executeShift(-1, 0)" style="padding: 8px; width: 36px; height: 36px; font-size: 14px; font-weight: bold; border-radius: 6px;" title="向左平移">◀</button>
+        <div id="shiftScopeLabel" style="font-size: 11px; color: var(--accent); font-weight: bold; text-align: center; line-height: 1.2;">整体</div>
+        <button class="btn btn-shift-right" onclick="executeShift(1, 0)" style="padding: 8px; width: 36px; height: 36px; font-size: 14px; font-weight: bold; border-radius: 6px;" title="向右平移">▶</button>
+        
+        <div></div>
+        <button class="btn btn-shift-down" onclick="executeShift(0, 1)" style="padding: 8px; width: 36px; height: 36px; font-size: 14px; font-weight: bold; border-radius: 6px;" title="向下平移">▼</button>
+        <div></div>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="control-group">
+      <div class="control-label">实时合规校验</div>
+      <div class="stat-card">
+        <div class="stat-row">
+          <span>总卡牌数</span>
+          <span id="statTileCount" class="stat-val">0 张</span>
+        </div>
+        <div class="stat-row">
+          <span>消除成对要求 (偶数)</span>
+          <span id="statParityStatus" class="status-badge status-pass">通过</span>
+        </div>
+        <div class="stat-row">
+          <span>同层重叠冲突</span>
+          <span id="statOverlapStatus" class="status-badge status-pass">无冲突</span>
+        </div>
+        <div class="stat-row">
+          <span>坐标范围合规</span>
+          <span id="statCoordsStatus" class="status-badge status-pass">合规</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exporting codes -->
+    <div class="control-group" style="margin-bottom: 0;">
+      <button class="btn btn-collapsible modern-only" onclick="toggleExportCollapse()" style="margin-bottom: 8px;">
+        <span>数据输出与复制</span>
+        <span id="exportCollapseIcon">▼</span>
+      </button>
+      
+      <div class="control-label classic-only">数据输出/复制</div>
+      
+      <div id="exportConsoleContent">
+        <div class="btn-grid">
+          <button class="btn" onclick="exportData('xlsx')">Excel 行</button>
+          <button class="btn" onclick="exportData('json')">关卡 JSON</button>
+        </div>
+        <textarea id="outputArea" readonly placeholder="点击上方按钮导出当前编辑数据..."></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast">
+  <span id="toastMsg">提示内容</span>
+</div>
+
+<script>
+  const scaleX = 20;
+  const scaleY = 25;
+  const boardW = 320;
+  const boardH = 540;
+
+  // Dynamic configuration loaded from server
+  let config = {
+    grid: { cols: 12, rows: 14, tileWidth: 2, tileHeight: 2 },
+    layers: {
+      max: 5,
+      colors: {
+        "1": "#808e9b",
+        "2": "#4bcffa",
+        "3": "#0be881",
+        "4": "#ffd32a",
+        "5": "#ff3f34"
+      }
+    }
+  };
+
+  let cols = 12;
+  let rows = 14;
+  let tileWidth = 2;
+  let tileHeight = 2;
+  let maxLayers = 5;
+  let colors = {};
+  let ghostBgColors = {};
+
+  let currentLayer = 1;
+  let activeTiles = []; // Array of { x, y, layout }
+  let allLoadedTemplates = {};
+  let sortedTemplateKeys = [];
+  let loadedTemplateName = "";
+
+  let isDirty = false;
+
+  function setDirty(val) {
+    isDirty = val;
+    updateUnsavedStatus();
+  }
+
+  function updateUnsavedStatus() {
+    const lvlTitle = document.getElementById('canvasLevelTitle');
+    const name = loadedTemplateName || '未命名模板';
+    
+    if (lvlTitle) {
+      if (isDirty) {
+        lvlTitle.innerHTML = `排版编辑工作台 (${name}) <span class="unsaved-star" style="color: #ff3f34; font-weight: bold; margin-left: 4px;" title="有未保存的更改">*</span>`;
+      } else {
+        lvlTitle.textContent = `排版编辑工作台 (${name})`;
+      }
+    }
+    
+    // Update browser document title
+    if (isDirty) {
+      document.title = `* ${name} - Match-2 Level Editor`;
+    } else {
+      document.title = `${name} - Match-2 Level Editor`;
+    }
+    
+    // Handle beforeunload confirmation
+    if (isDirty) {
+      window.onbeforeunload = function(e) {
+        e.preventDefault();
+        e.returnValue = '您有未保存的关卡修改，确定要离开吗？';
+        return '您有未保存的关卡修改，确定要离开吗？';
+      };
+    } else {
+      window.onbeforeunload = null;
+    }
+  }
+
+  async function init() {
+    try {
+      const res = await fetch('/data/config.json');
+      if (res.ok) {
+        config = await res.json();
+      }
+    } catch (e) {
+      console.warn("Could not load config.json, using defaults", e);
+    }
+
+    cols = config.grid.cols;
+    rows = config.grid.rows;
+    tileWidth = config.grid.tileWidth;
+    tileHeight = config.grid.tileHeight;
+    maxLayers = config.layers.max;
+
+    // Apply colors and generate CSS variables dynamically
+    const root = document.documentElement;
+    colors = {};
+    ghostBgColors = {};
+    for (let i = 1; i <= maxLayers; i++) {
+      const hex = config.layers.colors[i] || '#808e9b';
+      root.style.setProperty(`--color-l${i}`, hex);
+      colors[i] = `var(--color-l${i})`;
+      
+      const rgb = hexToRgb(hex);
+      ghostBgColors[i] = `rgba(${rgb}, 0.15)`;
+    }
+
+    // Build grid board cells dynamically
+    const gridBoard = document.getElementById('gridBoard');
+    document.querySelectorAll('.grid-cell').forEach(c => c.remove());
+    
+    gridBoard.style.gridTemplateColumns = `repeat(${cols}, 40px)`;
+    gridBoard.style.gridTemplateRows = `repeat(${rows}, 40px)`;
+    
+    for (let r = 0; r < rows; r++) {
+      const y = r;
+      for (let x = 0; x < cols; x++) {
+        const cell = document.createElement('div');
+        cell.className = 'grid-cell';
+        if (x % 2 === 0 && y % 2 === 0) {
+          cell.className += ' even-even';
+        }
+        cell.setAttribute('data-x', x);
+        cell.setAttribute('data-y', y);
+        gridBoard.appendChild(cell);
+      }
+    }
+
+    // Initialize shown layers based on starting currentLayer
+    shownLayersCount = 1;
+    renderLayerSelector();
+    
+    // Load templates list
+    await loadTemplatesList();
+  }
+
+  let shownLayersCount = 1;
+
+  function renderLayerSelector() {
+    const layerSelector = document.getElementById('layerSelector');
+    if (!layerSelector) return;
+    layerSelector.innerHTML = '';
+    
+    // Determine the minimum layers we should show:
+    // It should be the max of:
+    // - 1 (always show at least layer 1)
+    // - the currentLayer
+    // - the maximum layout in activeTiles
+    const maxTileLayer = activeTiles.length ? Math.max(...activeTiles.map(t => t.layout)) : 1;
+    shownLayersCount = Math.max(shownLayersCount, currentLayer, maxTileLayer);
+    
+    for (let i = 1; i <= shownLayersCount; i++) {
+      const hex = config.layers.colors[i] || '#808e9b';
+      const rgb = hexToRgb(hex);
+      
+      const layerBtn = document.createElement('div');
+      layerBtn.className = `layer-btn${i === currentLayer ? ' active' : ''}`;
+      layerBtn.id = `layerBtn${i}`;
+      layerBtn.setAttribute('onclick', `selectLayer(${i})`);
+      layerBtn.style.setProperty('--active-color', `var(--color-l${i})`);
+      layerBtn.style.setProperty('--active-rgb', rgb);
+      
+      // Calculate tile count for this layer dynamically
+      const tileCount = activeTiles.filter(t => t.layout === i).length;
+      
+      layerBtn.innerHTML = `
+        <div class="layer-btn-main">
+          <span>Layer ${i} <span class="layer-count" id="layerCount${i}" style="font-size: 11px; font-weight: normal; opacity: 0.7; margin-left: 6px;">(${tileCount} 张)</span></span>
+          <div class="layer-badge" style="background-color: var(--color-l${i});"></div>
+        </div>
+        <div class="layer-density-bar modern-only">
+          <div class="layer-density-fill" id="layerDensityFill${i}" style="background-color: var(--color-l${i});"></div>
+        </div>
+      `;
+      layerSelector.appendChild(layerBtn);
+    }
+    
+    // If shownLayersCount is less than the maxLayers limit from config, show the "+ 添加图层" button
+    if (shownLayersCount < maxLayers) {
+      const addBtn = document.createElement('button');
+      addBtn.className = 'btn btn-add-layer';
+      addBtn.style.width = '100%';
+      addBtn.style.marginTop = '10px';
+      addBtn.style.padding = '10px';
+      addBtn.style.fontSize = '13px';
+      addBtn.style.fontWeight = 'bold';
+      addBtn.style.border = '1px dashed var(--accent)';
+      addBtn.style.borderRadius = '6px';
+      addBtn.style.backgroundColor = 'transparent';
+      addBtn.style.color = 'var(--accent)';
+      addBtn.style.cursor = 'pointer';
+      addBtn.style.transition = 'all 0.2s ease';
+      
+      addBtn.onmouseover = () => {
+        addBtn.style.backgroundColor = 'rgba(75, 207, 250, 0.08)';
+        addBtn.style.borderColor = 'var(--accent-hover)';
+      };
+      addBtn.onmouseout = () => {
+        addBtn.style.backgroundColor = 'transparent';
+        addBtn.style.borderColor = 'var(--accent)';
+      };
+      
+      addBtn.innerHTML = '+ 添加新图层 (Add Layer)';
+      addBtn.onclick = () => {
+        addNewLayer();
+      };
+      layerSelector.appendChild(addBtn);
+    }
+  }
+
+  function addNewLayer() {
+    if (shownLayersCount >= maxLayers) {
+      showToast(`已达到最大图层限制 (${maxLayers} 层)！`, 'warn');
+      return;
+    }
+    shownLayersCount++;
+    selectLayer(shownLayersCount);
+  }
+
+  function hexToRgb(hex) {
+    var shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+    hex = hex.replace(shorthandRegex, function(m, r, g, b) {
+      return r + r + g + g + b + b;
+    });
+    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? `${parseInt(result[1], 16)},${parseInt(result[2], 16)},${parseInt(result[3], 16)}` : '128,128,128';
+  }
+
+  const gridBoard = document.getElementById('gridBoard');
+
+  // Handle mousemove on the gridBoard container to follow cursor instantly
+  gridBoard.addEventListener('mousemove', (e) => {
+    const rect = gridBoard.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const col = Math.floor(mouseX / 41);
+    const row = Math.floor(mouseY / 41);
+    
+    const x = Math.max(0, Math.min(cols - tileWidth, col));
+    const y = Math.max(0, Math.min(rows - tileHeight, row));
+    
+    handleCellHover(e, x, y);
+  });
+
+  // Handle click on the gridBoard container to place tiles
+  gridBoard.addEventListener('click', (e) => {
+    const rect = gridBoard.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    const col = Math.floor(mouseX / 41);
+    const row = Math.floor(mouseY / 41);
+    
+    const x = Math.max(0, Math.min(cols - tileWidth, col));
+    const y = Math.max(0, Math.min(rows - tileHeight, row));
+    
+    handleCellClick(e, x, y);
+  });
+
+  // Add grid board leave listener to hide ghost
+  gridBoard.addEventListener('mouseleave', () => {
+    document.getElementById('placementGhost').style.display = 'none';
+  });
+
+  // Load existing templates on initialization
+  async function loadTemplatesList() {
+    try {
+      const response = await fetch('/data/BoardTemplates.json');
+      if (response.ok) {
+        allLoadedTemplates = await response.json();
+        const selector = document.getElementById('templateSelector');
+        
+        // Clear previous options except first
+        selector.innerHTML = '<option value="">-- 选择模板 --</option>';
+        
+        sortedTemplateKeys = Object.keys(allLoadedTemplates)
+          .sort((a,b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
+          
+        sortedTemplateKeys.forEach(key => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = `${key} (${allLoadedTemplates[key].length} 张牌)`;
+            selector.appendChild(opt);
+          });
+          
+        if (loadedTemplateName && allLoadedTemplates[loadedTemplateName]) {
+          selector.value = loadedTemplateName;
+        }
+        if (typeof rebuildExplorer === 'function') {
+          rebuildExplorer();
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load templates list automatically.", e);
+    }
+  }
+
+  // Load template details
+  function loadSelectedTemplate() {
+    const selectedKey = document.getElementById('templateSelector').value;
+    if (!selectedKey) return false;
+    
+    // Check for unsaved changes before switching
+    if (isDirty && selectedKey !== loadedTemplateName) {
+      if (!confirm(`当前模板 [${loadedTemplateName || '未命名'}] 有未保存的修改，切换将丢失这些修改。确定要切换吗？`)) {
+        // Restore selector value to currently loaded template name
+        const selector = document.getElementById('templateSelector');
+        if (selector) {
+          selector.value = loadedTemplateName;
+        }
+        return false;
+      }
+    }
+    
+    const tpl = allLoadedTemplates[selectedKey];
+    if (tpl) {
+      loadedTemplateName = selectedKey;
+      activeTiles = tpl.map(t => ({ x: t.x, y: t.y, layout: t.layout }));
+      
+      // Calculate the maximum layer in the loaded template's tiles
+      const maxTileLayer = activeTiles.length ? Math.max(...activeTiles.map(t => t.layout)) : 1;
+      shownLayersCount = Math.max(1, maxTileLayer);
+      currentLayer = 1; // Re-focus to layer 1
+      
+      // Re-render layer selector
+      renderLayerSelector();
+      
+      // Reset dirty state on successful load
+      setDirty(false);
+      
+      renderTiles();
+      updateStats();
+      showToast(`已成功加载 ${selectedKey}！`, 'success');
+      
+      // Update workspace header title
+      const lvlTitle = document.getElementById('canvasLevelTitle');
+      if (lvlTitle) {
+        lvlTitle.innerHTML = `排版编辑工作台 (${selectedKey})`;
+      }
+      
+      // Sync active explorer list item
+      document.querySelectorAll('.explorer-item').forEach(el => {
+        if (el.dataset.key === selectedKey) {
+          el.classList.add('active');
+          el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        } else {
+          el.classList.remove('active');
+        }
+      });
+      
+      // Update URL search parameter dynamically
+      try {
+        const url = new URL(window.location);
+        url.searchParams.set('template', selectedKey);
+        window.history.replaceState({}, '', url);
+      } catch (e) {
+        console.warn("Failed to update URL param", e);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  // Create a brand new level template
+  function createNewTemplate() {
+    // Generate suggested next template ID
+    let nextIdx = 1;
+    sortedTemplateKeys.forEach(k => {
+      const num = parseInt(k.replace('template_', ''));
+      if (!isNaN(num) && num >= nextIdx) {
+        nextIdx = num + 1;
+      }
+    });
+    const defaultId = `template_${nextIdx}`;
+    
+    const newKey = prompt(`请输入新建关卡模板的ID（必须以 'template_' 加上数字结尾）：`, defaultId);
+    if (!newKey) return;
+    
+    if (!/^template_\d+$/.test(newKey)) {
+      showToast("模板ID格式无效，必须以 'template_' 加上数字结尾（例如: template_101）！", "error");
+      return;
+    }
+    
+    if (allLoadedTemplates[newKey]) {
+      showToast(`该模板ID [${newKey}] 已存在！`, "error");
+      return;
+    }
+    
+    if (isDirty) {
+      if (!confirm("当前画布有未保存的修改，新建关卡将清空当前画布。是否确定？")) {
+        return;
+      }
+    }
+    
+    // Create new template entry
+    allLoadedTemplates[newKey] = [];
+    sortedTemplateKeys = Object.keys(allLoadedTemplates)
+      .sort((a,b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
+      
+    // Rebuild select options
+    const selector = document.getElementById('templateSelector');
+    if (selector) {
+      selector.innerHTML = '<option value="">-- 选择模板 --</option>';
+      sortedTemplateKeys.forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = `${key} (${allLoadedTemplates[key].length} 张牌)`;
+        selector.appendChild(opt);
+      });
+      selector.value = newKey;
+    }
+    
+    // Set level properties
+    loadedTemplateName = newKey;
+    activeTiles = [];
+    shownLayersCount = 1;
+    currentLayer = 1;
+    
+    // Update interface
+    rebuildExplorer();
+    renderLayerSelector();
+    renderTiles();
+    updateStats();
+    setDirty(true); // New template is unsaved
+    
+    // Highlight the active explorer item
+    document.querySelectorAll('.explorer-item').forEach(el => {
+      if (el.dataset.key === newKey) {
+        el.classList.add('active');
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      } else {
+        el.classList.remove('active');
+      }
+    });
+    
+    // Update URL search parameter dynamically
+    try {
+      const url = new URL(window.location);
+      url.searchParams.set('template', newKey);
+      window.history.replaceState({}, '', url);
+    } catch (e) {
+      console.warn("Failed to update URL param", e);
+    }
+    
+    showToast(`新建关卡模板 ${newKey} 成功！开始编辑并按 Ctrl+S 保存。`, 'success');
+  }
+
+  // Navigate to previous or next template
+  function navigateTemplate(direction) {
+    if (sortedTemplateKeys.length === 0) {
+      showToast("未加载模板列表！", "warn");
+      return;
+    }
+    
+    const selector = document.getElementById('templateSelector');
+    const currentKey = selector.value;
+    
+    let nextIndex = 0;
+    if (currentKey) {
+      const currentIndex = sortedTemplateKeys.indexOf(currentKey);
+      if (currentIndex > -1) {
+        nextIndex = currentIndex + direction;
+        // Wrap around limits
+        if (nextIndex < 0) {
+          nextIndex = sortedTemplateKeys.length - 1;
+        } else if (nextIndex >= sortedTemplateKeys.length) {
+          nextIndex = 0;
+        }
+      }
+    } else {
+      // If nothing is selected, start at first if direction > 0, or last if direction < 0
+      nextIndex = direction > 0 ? 0 : sortedTemplateKeys.length - 1;
+    }
+    
+    const targetKey = sortedTemplateKeys[nextIndex];
+    selector.value = targetKey;
+    loadSelectedTemplate();
+  }
+
+  // Choose editing layer
+  function selectLayer(layer) {
+    currentLayer = layer;
+    
+    // Re-render layer selector to update active states and shown layer count
+    renderLayerSelector();
+    
+    // Update shift label if layer scope is active
+    if (shiftScope === 'layer') {
+      const label = document.getElementById('shiftScopeLabel');
+      if (label) {
+        label.textContent = `单层L${layer}`;
+        label.style.color = `var(--color-l${layer})`;
+      }
+    }
+    
+    // Update active layer glow color on the board container (modern theme)
+    const board = document.getElementById('gridBoard');
+    if (board) {
+      board.style.setProperty('--layer-glow-color', colors[layer]);
+    }
+    
+    renderTiles();
+    updateStats();
+  }
+
+  let viewMode = 'all'; // 'all', 'focus', 'current'
+  let showLowerLayerRef = false; // Whether to show lower layer as reference in 'current' mode
+
+  function setViewMode(mode) {
+    viewMode = mode;
+    document.querySelectorAll('.btn-view').forEach(btn => btn.classList.remove('active'));
+    
+    // Sync classic buttons
+    const classicBtn = document.getElementById(`viewMode${mode.charAt(0).toUpperCase() + mode.slice(1)}`);
+    if (classicBtn) classicBtn.classList.add('active');
+    
+    // Sync modern buttons
+    const modernBtn = document.getElementById(`viewMode${mode.charAt(0).toUpperCase() + mode.slice(1)}Modern`);
+    if (modernBtn) modernBtn.classList.add('active');
+    
+    // Show/hide lower layer reference toggles
+    const refGroup = document.getElementById('lowerLayerRefGroup');
+    if (refGroup) {
+      refGroup.style.display = (mode === 'current') ? 'block' : 'none';
+    }
+    
+    const refGroupModern = document.getElementById('lowerLayerRefGroupModern');
+    if (refGroupModern) {
+      refGroupModern.style.display = (mode === 'current') ? 'flex' : 'none';
+    }
+    
+    renderTiles();
+  }
+
+  function toggleLowerLayerRef(visible) {
+    showLowerLayerRef = visible;
+    syncToggle('lowerLayerRefToggle', visible);
+    syncToggle('lowerLayerRefToggleModern', visible);
+    renderTiles();
+  }
+
+  function toggleCrosshair(visible) {
+    syncToggle('crosshairToggle', visible);
+    syncToggle('crosshairToggleModern', visible);
+    const vLine = document.getElementById('crosshair-v');
+    const hLine = document.getElementById('crosshair-h');
+    if (vLine && hLine) {
+      const display = visible ? 'block' : 'none';
+      vLine.style.display = display;
+      hLine.style.display = display;
+    }
+  }
+
+  // Helper to clamp coordinates to valid board bounds
+  function getPlacementCoordinates(x, y, layer) {
+    let alignedX = Math.max(0, Math.min(cols - tileWidth, x));
+    let alignedY = Math.max(0, Math.min(rows - tileHeight, y));
+    return { x: alignedX, y: alignedY };
+  }
+
+  // Hover preview ghost placement outline
+  function handleCellHover(e, x, y) {
+    const aligned = getPlacementCoordinates(x, y, currentLayer);
+    const ghost = document.getElementById('placementGhost');
+    
+    // Update cursor coordinates footer (modern only)
+    const coordsLabel = document.getElementById('footerCoordinates');
+    if (coordsLabel) {
+      coordsLabel.textContent = `X: ${aligned.x}, Y: ${aligned.y}`;
+    }
+    
+    // Cell size is 40px in UI (plus 1px border)
+    // Coordinate conversion in grid board DOM (top = alignedY * 41, left = alignedX * 41)
+    const left = aligned.x * 41 + 1;
+    const top = aligned.y * 41 + 1;
+    
+    ghost.style.left = `${left}px`;
+    ghost.style.top = `${top}px`;
+    
+    // Check if it overlaps with any existing tile on the same layer
+    const isOverlapping = activeTiles.some(t => 
+      t.layout === currentLayer && 
+      Math.abs(t.x - aligned.x) < 2 && 
+      Math.abs(t.y - aligned.y) < 2
+    );
+    
+    if (isOverlapping) {
+      ghost.style.borderColor = 'var(--danger)';
+      ghost.style.backgroundColor = 'rgba(255, 63, 52, 0.25)';
+    } else {
+      ghost.style.borderColor = colors[currentLayer];
+      ghost.style.backgroundColor = ghostBgColors[currentLayer];
+    }
+    
+    ghost.style.display = 'block';
+  }
+
+  // Toggle placement of tile
+  function handleCellClick(e, x, y) {
+    const aligned = getPlacementCoordinates(x, y, currentLayer);
+    
+    // Check if a tile already exists at this layer and coordinates
+    const existingIndex = activeTiles.findIndex(t => t.x === aligned.x && t.y === aligned.y && t.layout === currentLayer);
+    
+    if (existingIndex > -1) {
+      // Remove it
+      activeTiles.splice(existingIndex, 1);
+      setDirty(true);
+      renderTiles();
+      updateStats();
+    } else {
+      // Check for same-layer overlap:
+      // Since each tile is 2x2 grid units, any tile t with Math.abs(t.x - aligned.x) < 2 and Math.abs(t.y - aligned.y) < 2 overlaps.
+      const overlapTile = activeTiles.find(t => 
+        t.layout === currentLayer && 
+        Math.abs(t.x - aligned.x) < 2 && 
+        Math.abs(t.y - aligned.y) < 2
+      );
+      
+      if (overlapTile) {
+        showToast(`无法在此处放置：与当前层 (${overlapTile.x}, ${overlapTile.y}) 处的卡牌重叠！`, 'error');
+        return;
+      }
+      
+      // Place it
+      activeTiles.push({
+        x: aligned.x,
+        y: aligned.y,
+        layout: currentLayer
+      });
+      setDirty(true);
+      renderTiles();
+      updateStats();
+    }
+  }
+
+  let shiftScope = 'all'; // 'all', 'layer'
+  
+  function setShiftScope(scope) {
+    shiftScope = scope;
+    document.querySelectorAll('.btn-scope').forEach(btn => btn.classList.remove('active'));
+    
+    const label = document.getElementById('shiftScopeLabel');
+    if (scope === 'all') {
+      document.getElementById('shiftScopeAll').classList.add('active');
+      if (label) {
+        label.textContent = '整体';
+        label.style.color = 'var(--accent)';
+      }
+    } else {
+      document.getElementById('shiftScopeLayer').classList.add('active');
+      if (label) {
+        label.textContent = `单层L${currentLayer}`;
+        label.style.color = `var(--color-l${currentLayer})`;
+      }
+    }
+  }
+
+  // Shift tiles by dx, dy based on selected scope
+  function executeShift(dx, dy) {
+    if (activeTiles.length === 0) {
+      showToast("画布为空，无需平移！", "warn");
+      return;
+    }
+    
+    // Select tiles that should be moved
+    const targetTiles = shiftScope === 'all' 
+      ? activeTiles 
+      : activeTiles.filter(t => t.layout === currentLayer);
+      
+    if (targetTiles.length === 0) {
+      showToast(`当前层 Layer ${currentLayer} 没有卡牌，无需平移！`, "warn");
+      return;
+    }
+    
+    // Check if any target tile would go out of bounds
+    const wouldBeOutOfBounds = targetTiles.some(t => {
+      const newX = t.x + dx;
+      const newY = t.y + dy;
+      return newX < 0 || newX > (cols - tileWidth) || newY < 0 || newY > (rows - tileHeight);
+    });
+    
+    if (wouldBeOutOfBounds) {
+      showToast("无法平移：平移后将超出网格边界！", "error");
+      return;
+    }
+    
+    // Apply shift to the selected tiles
+    activeTiles = activeTiles.map(t => {
+      if (shiftScope === 'all' || t.layout === currentLayer) {
+        return {
+          x: t.x + dx,
+          y: t.y + dy,
+          layout: t.layout
+        };
+      }
+      return t;
+    });
+    
+    setDirty(true);
+    renderTiles();
+    updateStats();
+    
+    let direction = "";
+    if (dx > 0) direction = "右";
+    else if (dx < 0) direction = "左";
+    else if (dy > 0) direction = "下";
+    else if (dy < 0) direction = "上";
+    
+    const scopeName = shiftScope === 'all' ? "整体" : `当前图层L${currentLayer}`;
+    showToast(`${scopeName}已向${direction}平移 1 格！`, "success");
+  }
+
+  // Clear board
+  function clearBoard() {
+    if (confirm("确定要清空画布吗？所有的修改都将丢失！")) {
+      activeTiles = [];
+      setDirty(true);
+      renderTiles();
+      updateStats();
+      showToast("画布已清空！", "success");
+    }
+  }
+
+  // Render placed tiles visually on the screen
+  function renderTiles() {
+    // Clear old rendered tiles
+    document.querySelectorAll('.board-tile').forEach(el => el.remove());
+    
+    // For centering logic, calculate bounds dynamically
+    const xs = activeTiles.map(t => t.x);
+    const ys = activeTiles.map(t => t.y);
+    const minX = xs.length ? Math.min(...xs) : 0;
+    const maxX = xs.length ? Math.max(...xs) : 0;
+    const minY = ys.length ? Math.min(...ys) : 0;
+    const maxY = ys.length ? Math.max(...ys) : 0;
+    const gridW = xs.length ? (maxX - minX + 2) : 12;
+    const gridH = ys.length ? (maxY - minY + 2) : 14;
+
+    const boardW_UI = 451; // Grid Board Width
+    const boardH_UI = 533; // Grid Board Height
+
+    // Draw tiles sorted by layer
+    activeTiles.sort((a,b) => a.layout - b.layout).forEach((t, index) => {
+      const isCurrent = (t.layout === currentLayer);
+      const isLowerRef = (viewMode === 'current' && showLowerLayerRef && currentLayer > 1 && t.layout === currentLayer - 1);
+      
+      // If we are in 'current' mode, skip other layers except the immediate lower reference layer
+      if (viewMode === 'current' && !isCurrent && !isLowerRef) {
+        return;
+      }
+      
+      const tileEl = document.createElement('div');
+      tileEl.className = 'board-tile';
+      
+      // Calculate top/left offset in CSS coordinates inside grid
+      const left = t.x * 41 + 1;
+      const top = t.y * 41 + 1;
+      const zIndex = t.layout * 10;
+      
+      // Apply offset for 3D stacking effect (only when showing multiple layers)
+      const stackOffset = (viewMode === 'current') ? 0 : (t.layout - 1) * -4;
+      
+      tileEl.style.left = `${left + stackOffset}px`;
+      tileEl.style.top = `${top + stackOffset}px`;
+      tileEl.style.zIndex = isLowerRef ? zIndex - 5 : zIndex; // Reference tiles sit slightly below current layer tiles visually
+      tileEl.style.backgroundColor = colors[t.layout];
+      
+      // Check if this tile is floating (needs at least one overlapping tile on the layer below)
+      let isFloating = false;
+      if (t.layout > 1 && !isLowerRef) {
+        const hasSupport = activeTiles.some(tParent => {
+          return tParent.layout === t.layout - 1 &&
+                 Math.abs(tParent.x - t.x) < 2 &&
+                 Math.abs(tParent.y - t.y) < 2;
+        });
+        if (!hasSupport) {
+          isFloating = true;
+        }
+      }
+
+      if (isFloating) {
+        tileEl.classList.add('floating-tile');
+      }
+
+      // Disable pointer interaction for other layers so they are click-through
+      if (!isCurrent) {
+        tileEl.style.pointerEvents = 'none';
+        if (viewMode === 'focus') {
+          tileEl.style.opacity = '0.15';
+          tileEl.style.filter = 'grayscale(80%)';
+        } else if (isLowerRef) {
+          tileEl.style.opacity = '0.22';
+          tileEl.style.filter = 'grayscale(90%)';
+          tileEl.style.border = '2px dashed rgba(255, 255, 255, 0.4)';
+        }
+      }
+      
+      if (isLowerRef) {
+        tileEl.innerHTML = `<span style="font-size:10px; color:#555;">(${t.x},${t.y})</span><span style="font-size:11px; opacity:0.6;">L${t.layout} (底)</span>`;
+      } else {
+        tileEl.innerHTML = `<span style="font-size:10px; color:#444;">(${t.x},${t.y})</span><span style="font-size:12px;">L${t.layout}</span>`;
+        if (isFloating) {
+          tileEl.innerHTML += `<div class="floating-warning-badge" title="悬空：下方图层 L${t.layout - 1} 无支撑卡牌！">⚠️ 悬空</div>`;
+        }
+      }
+      
+      // Click again to remove
+      tileEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+        activeTiles = activeTiles.filter(tile => !(tile.x === t.x && tile.y === t.y && tile.layout === t.layout));
+        setDirty(true);
+        renderTiles();
+        updateStats();
+      });
+      
+      gridBoard.appendChild(tileEl);
+    });
+  }
+
+  // Perform checks and update stats block
+  function updateStats() {
+    const tileCount = activeTiles.length;
+    document.getElementById('statTileCount').textContent = `${tileCount} 张`;
+    
+    // Update layer count indicators
+    const counts = {};
+    for (let l = 1; l <= maxLayers; l++) {
+      counts[l] = 0;
+    }
+    activeTiles.forEach(t => {
+      if (counts[t.layout] !== undefined) {
+        counts[t.layout]++;
+      }
+    });
+    for (let l = 1; l <= maxLayers; l++) {
+      const el = document.getElementById(`layerCount${l}`);
+      if (el) {
+        el.textContent = `(${counts[l]} 张)`;
+      }
+      
+      // Update layer density bar width (modern only)
+      const fillEl = document.getElementById(`layerDensityFill${l}`);
+      if (fillEl) {
+        const pct = tileCount > 0 ? (counts[l] / tileCount) * 100 : 0;
+        fillEl.style.width = `${pct}%`;
+      }
+    }
+    
+    // Update workspace footer statistics (modern only)
+    const footerLayerCount = document.getElementById('footerLayerTilesCount');
+    if (footerLayerCount) {
+      footerLayerCount.textContent = `${counts[currentLayer]} 张`;
+    }
+    const footerPairs = document.getElementById('footerPairsCount');
+    if (footerPairs) {
+      const pairs = Math.floor(tileCount / 2);
+      const isEven = tileCount % 2 === 0;
+      footerPairs.textContent = `${pairs} 对` + (isEven ? '' : ' (余1)');
+    }
+    
+    // Update Explorer list active item metadata (modern only)
+    if (typeof updateExplorerActiveItem === 'function') {
+      updateExplorerActiveItem();
+    }
+    
+    // Parity Check (even tile count)
+    const parityBadge = document.getElementById('statParityStatus');
+    if (tileCount === 0) {
+      parityBadge.className = 'status-badge status-warn';
+      parityBadge.textContent = '空白';
+    } else if (tileCount % 2 === 0) {
+      parityBadge.className = 'status-badge status-pass';
+      parityBadge.textContent = '通过';
+    } else {
+      parityBadge.className = 'status-badge status-fail';
+      parityBadge.textContent = '未通过 (奇数)';
+    }
+
+    // Overlap Check (no two tiles on same layer have distance < 2)
+    let hasOverlap = false;
+    const overlapBadge = document.getElementById('statOverlapStatus');
+    
+    for (let i = 0; i < activeTiles.length; i++) {
+      for (let j = i + 1; j < activeTiles.length; j++) {
+        if (activeTiles[i].layout === activeTiles[j].layout) {
+          const dx = Math.abs(activeTiles[i].x - activeTiles[j].x);
+          const dy = Math.abs(activeTiles[i].y - activeTiles[j].y);
+          if (dx < 2 && dy < 2) {
+            hasOverlap = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    if (hasOverlap) {
+      overlapBadge.className = 'status-badge status-fail';
+      overlapBadge.textContent = '存在冲突';
+    } else {
+      overlapBadge.className = 'status-badge status-pass';
+      overlapBadge.textContent = '无冲突';
+    }
+
+    // Coords Check (all tiles within boundaries)
+    let isAligned = true;
+    const coordsBadge = document.getElementById('statCoordsStatus');
+    
+    activeTiles.forEach(t => {
+      if (t.x < 0 || t.x > (cols - tileWidth) || t.y < 0 || t.y > (rows - tileHeight)) {
+        isAligned = false;
+      }
+    });
+    
+    if (!isAligned) {
+      coordsBadge.className = 'status-badge status-fail';
+      coordsBadge.textContent = '超出边界';
+    } else {
+      coordsBadge.className = 'status-badge status-pass';
+      coordsBadge.textContent = '合规';
+    }
+  }
+
+  // Generate Excel row data or JSON code
+  function exportData(format) {
+    const area = document.getElementById('outputArea');
+    
+    if (activeTiles.length === 0) {
+      area.value = "没有已放置的卡牌数据！";
+      return;
+    }
+
+    if (format === 'xlsx') {
+      const maxLayout = activeTiles.length ? Math.max(...activeTiles.map(t => t.layout)) : 1;
+      let text = "id\tx\ty\tlayout\tlayoutMax\tboardId\n";
+      activeTiles.forEach((t, i) => {
+        text += `${i+1}\t${t.x}\t${t.y}\t${t.layout}\t${maxLayout}\t1\n`;
+      });
+      area.value = text;
+      area.select();
+      showToast("Excel Tab 数据已生成并自动选中，可以直接按 Ctrl+C 复制！", "success");
+    } else if (format === 'json') {
+      // Competitor level cells structure
+      const cells = [];
+      
+      // Group by col, row
+      const map = {};
+      activeTiles.forEach(t => {
+        // Map x, y back to column/row (using custom scaling logic if necessary, or simple 1-1 mappings)
+        const key = `${t.x}_${t.y}`;
+        if (!map[key]) {
+          map[key] = {
+            column: t.x,
+            row: t.y,
+            gridObjects: []
+          };
+        }
+        // competitor layer is 0-indexed, ours is 1-indexed
+        map[key].gridObjects.push({
+          layer: t.layout - 1
+        });
+      });
+      
+      const output = {
+        cells: Object.values(map)
+      };
+      
+      area.value = JSON.stringify(output, null, 2);
+      area.select();
+      showToast("竞品格式 JSON 已生成并自动选中，可以直接按 Ctrl+C 复制！", "success");
+    }
+  }
+
+  // Toast notifier helper
+  function showToast(msg, type = 'success') {
+    const toast = document.getElementById('toast');
+    const msgSpan = document.getElementById('toastMsg');
+    
+    msgSpan.textContent = msg;
+    toast.className = `show ${type}`;
+    
+    setTimeout(() => {
+      toast.className = '';
+    }, 3000);
+  }
+
+  // Run comprehensive GDD layout validation rules
+  function validateLevel() {
+    const errors = [];
+    const tileCount = activeTiles.length;
+    
+    // 1. Empty Check
+    if (tileCount === 0) {
+      errors.push("画布为空，没有摆放任何卡牌！");
+      return errors;
+    }
+    
+    // 2. Parity Check (even number of tiles)
+    if (tileCount % 2 !== 0) {
+      errors.push(`卡牌总数为奇数（当前共 ${tileCount} 张），奇数张卡牌将导致玩家无法完全配对消除通关！`);
+    }
+    
+    // 3. Same-layer overlap check
+    let overlapCount = 0;
+    for (let i = 0; i < activeTiles.length; i++) {
+      for (let j = i + 1; j < activeTiles.length; j++) {
+        if (activeTiles[i].layout === activeTiles[j].layout) {
+          const dx = Math.abs(activeTiles[i].x - activeTiles[j].x);
+          const dy = Math.abs(activeTiles[i].y - activeTiles[j].y);
+          if (dx < 2 && dy < 2) {
+            overlapCount++;
+            if (overlapCount <= 3) {
+              errors.push(`同层卡牌重叠冲突：图层 L${activeTiles[i].layout} 坐标 (${activeTiles[i].x}, ${activeTiles[i].y}) 与 (${activeTiles[j].x}, ${activeTiles[j].y}) 重叠`);
+            }
+          }
+        }
+      }
+    }
+    if (overlapCount > 3) {
+      errors.push(`同层卡牌重叠冲突：另有 ${overlapCount - 3} 处重叠冲突`);
+    }
+    
+    // 4. Boundary check
+    let outOfBoundsCount = 0;
+    activeTiles.forEach(t => {
+      if (t.x < 0 || t.x > (cols - tileWidth) || t.y < 0 || t.y > (rows - tileHeight)) {
+        outOfBoundsCount++;
+        if (outOfBoundsCount <= 3) {
+          errors.push(`卡牌坐标越界：图层 L${t.layout} 坐标 (${t.x}, ${t.y}) 超出边界 [0..${cols - tileWidth}] x [0..${rows - tileHeight}]`);
+        }
+      }
+    });
+    if (outOfBoundsCount > 3) {
+      errors.push(`卡牌坐标越界：另有 ${outOfBoundsCount - 3} 处越界卡牌`);
+    }
+    
+    // 5. Floating check (tiles on L2-L5 must overlap with at least one tile on the layer directly below)
+    let floatingCount = 0;
+    activeTiles.forEach(t => {
+      if (t.layout > 1) {
+        const hasSupport = activeTiles.some(tParent => {
+          return tParent.layout === t.layout - 1 &&
+                 Math.abs(tParent.x - t.x) < 2 &&
+                 Math.abs(tParent.y - t.y) < 2;
+        });
+        if (!hasSupport) {
+          floatingCount++;
+          if (floatingCount <= 3) {
+            errors.push(`卡牌悬空：图层 L${t.layout} 坐标 (${t.x}, ${t.y}) 的卡牌在 L${t.layout - 1} 层没有卡牌提供支撑`);
+          }
+        }
+      }
+    });
+    if (floatingCount > 3) {
+      errors.push(`卡牌悬空：另有 ${floatingCount - 3} 处卡牌悬空`);
+    }
+    
+    return errors;
+  }
+
+  // Save edited layout back to BoardTemplates.json dynamically!
+  async function saveToTemplates(isQuick = false) {
+    // Run layout validation check before saving
+    const errors = validateLevel();
+    if (errors.length > 0 && !isQuick) {
+      const confirmSave = confirm(
+        "【保存合规性检测警告】\n\n" + 
+        errors.map((e, idx) => `${idx + 1}. ${e}`).join("\n") + 
+        "\n\n⚠️ 建议修复以上问题以防止生成有缺陷的关卡。是否仍要强制保存该模板？"
+      );
+      if (!confirmSave) {
+        return;
+      }
+    } else if (errors.length > 0 && isQuick) {
+      // For quick save, show validation warnings in toast only (non-blocking)
+      showToast(`保存成功，但检测到 ${errors.length} 项合规性警告，请留意！`, "warn");
+    }
+
+    let selectedKey = document.getElementById('templateSelector').value;
+    
+    // Fallback to loadedTemplateName if select value got lost or was cleared
+    if (!selectedKey && loadedTemplateName) {
+      selectedKey = loadedTemplateName;
+    }
+    
+    if (!selectedKey) {
+      const newKey = prompt("请输入要新建/覆盖的模板ID（例如: template_1）：");
+      if (!newKey || !newKey.startsWith('template_')) {
+        showToast("模板ID格式无效，必须以 'template_' 开头！", "error");
+        return;
+      }
+      selectedKey = newKey;
+      loadedTemplateName = newKey;
+      allLoadedTemplates[newKey] = activeTiles;
+    } else {
+      // Bypass confirmation check if saving to the currently loaded template OR if it is a Ctrl+S quick save
+      if (selectedKey !== loadedTemplateName && !isQuick) {
+        if (!confirm(`确定要覆盖现有的模板 ${selectedKey} 吗？`)) {
+          return;
+        }
+      }
+      loadedTemplateName = selectedKey;
+      allLoadedTemplates[selectedKey] = activeTiles;
+    }
+
+    try {
+      if (isQuick && errors.length === 0) {
+        showToast("保存中...", "warn");
+      } else if (!isQuick) {
+        showToast("正在保存模板到后端...", "warn");
+      }
+      
+      const saveResponse = await fetch('/api/save-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(allLoadedTemplates)
+      });
+      
+      if (saveResponse.ok) {
+        setDirty(false); // Clear the unsaved changes state on successful save!
+        showToast("模板保存成功！后台生成管道运行中...", "success");
+        
+        // Update local status immediately in the UI
+        if (typeof updateExplorerActiveItem === 'function') {
+          updateExplorerActiveItem();
+        }
+        
+        // Trigger automated generation pipeline asynchronously (non-blocking)
+        fetch('/api/run-pipeline', { method: 'POST' })
+          .then(async (pipelineResponse) => {
+            if (pipelineResponse.ok) {
+              const result = await pipelineResponse.json();
+              console.log(result.stdout);
+              showToast("后台构建完成！Excel表格和预览页面已全部更新！", "success");
+              loadTemplatesList();
+            } else {
+              showToast("后台自动构建失败，请确保本地服务器环境正常！", "error");
+            }
+          })
+          .catch((err) => {
+            console.error("Pipeline background execution error:", err);
+            showToast("自动构建管道连接失败！", "error");
+          });
+      } else {
+        showToast("后端保存出错，请确认 server.js 运行正常！", "error");
+      }
+    } catch (e) {
+      showToast("连接本地服务器失败，请确保本地服务器启动中！", "error");
+    }
+  }
+
+  // --- Modern Theme / IDE Layout Functions ---
+  let isExportCollapsed = true;
+  function toggleTheme() {
+    const isModern = document.body.classList.toggle('theme-modern');
+    localStorage.setItem('editor_theme', isModern ? 'modern' : 'classic');
+    
+    // Update button text
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+      btn.textContent = isModern ? "返回旧版布局" : "体验新版布局";
+      if (isModern) {
+        btn.style.borderColor = '#8e8e9f';
+        btn.style.color = '#8e8e9f';
+      } else {
+        btn.style.borderColor = 'var(--accent)';
+        btn.style.color = 'var(--accent)';
+      }
+    }
+    
+    // Sync export console visibility
+    const content = document.getElementById('exportConsoleContent');
+    if (content) {
+      content.style.display = isModern ? (isExportCollapsed ? 'none' : 'block') : 'block';
+    }
+    
+    if (isModern) {
+      rebuildExplorer();
+    }
+    
+    // Trigger board glow update
+    selectLayer(currentLayer);
+    renderTiles();
+  }
+
+  function toggleExportCollapse() {
+    isExportCollapsed = !isExportCollapsed;
+    const content = document.getElementById('exportConsoleContent');
+    const icon = document.getElementById('exportCollapseIcon');
+    if (content && icon) {
+      content.style.display = isExportCollapsed ? 'none' : 'block';
+      icon.textContent = isExportCollapsed ? '▼' : '▲';
+    }
+  }
+
+  // --- Explorer List Population and Searching ---
+  function rebuildExplorer() {
+    const list = document.getElementById('explorerList');
+    if (!list) return;
+    
+    list.innerHTML = '';
+    
+    sortedTemplateKeys.forEach(key => {
+      const tiles = allLoadedTemplates[key];
+      const validity = checkTemplateValidity(tiles);
+      
+      const item = document.createElement('div');
+      item.className = 'explorer-item' + (key === loadedTemplateName ? ' active' : '');
+      item.dataset.key = key;
+      item.onclick = () => {
+        const selector = document.getElementById('templateSelector');
+        if (selector) {
+          selector.value = key;
+          const loaded = loadSelectedTemplate();
+          if (loaded) {
+            document.querySelectorAll('.explorer-item').forEach(el => el.classList.remove('active'));
+            item.classList.add('active');
+          }
+        }
+      };
+      
+      const statusClass = validity.ok ? 'status-pass' : 'status-fail';
+      
+      item.innerHTML = `
+        <div class="explorer-item-name">${key}</div>
+        <div class="explorer-item-meta">
+          <span class="explorer-item-count">${tiles ? tiles.length : 0}张</span>
+          <span class="explorer-item-status ${statusClass}">${validity.msg}</span>
+        </div>
+      `;
+      list.appendChild(item);
+    });
+  }
+
+  function filterExplorerList() {
+    const query = document.getElementById('explorerSearch').value.toLowerCase();
+    const items = document.querySelectorAll('.explorer-item');
+    items.forEach(item => {
+      const name = item.dataset.key.toLowerCase();
+      if (name.includes(query)) {
+        item.style.display = 'flex';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  }
+
+  function updateExplorerActiveItem() {
+    if (!loadedTemplateName) return;
+    const targetItem = document.querySelector(`.explorer-item[data-key="${loadedTemplateName}"]`);
+    if (targetItem) {
+      allLoadedTemplates[loadedTemplateName] = activeTiles;
+      
+      const countEl = targetItem.querySelector('.explorer-item-count');
+      const statusEl = targetItem.querySelector('.explorer-item-status');
+      
+      if (countEl && statusEl) {
+        countEl.textContent = `${activeTiles.length}张`;
+        const validity = checkTemplateValidity(activeTiles);
+        statusEl.textContent = validity.msg;
+        statusEl.className = `explorer-item-status ${validity.ok ? 'status-pass' : 'status-fail'}`;
+      }
+    }
+  }
+
+  function checkTemplateValidity(tiles) {
+    if (!tiles || tiles.length === 0) return { ok: false, msg: "空" };
+    if (tiles.length % 2 !== 0) return { ok: false, msg: "奇数" };
+    
+    // Check overlaps
+    for (let i = 0; i < tiles.length; i++) {
+      for (let j = i + 1; j < tiles.length; j++) {
+        if (Number(tiles[i].layout) === Number(tiles[j].layout)) {
+          if (Math.abs(Number(tiles[i].x) - Number(tiles[j].x)) < 2 && Math.abs(Number(tiles[i].y) - Number(tiles[j].y)) < 2) {
+            return { ok: false, msg: "重叠" };
+          }
+        }
+      }
+    }
+    
+    // Check bounds
+    for (let i = 0; i < tiles.length; i++) {
+      if (Number(tiles[i].x) < 0 || Number(tiles[i].x) > (cols - tileWidth) || Number(tiles[i].y) < 0 || Number(tiles[i].y) > (rows - tileHeight)) {
+        return { ok: false, msg: "越界" };
+      }
+    }
+    
+    // Check floating
+    for (let i = 0; i < tiles.length; i++) {
+      const t = tiles[i];
+      if (Number(t.layout) > 1) {
+        const hasSupport = tiles.some(tp => {
+          return Number(tp.layout) === Number(t.layout) - 1 &&
+                 Math.abs(Number(tp.x) - Number(t.x)) < 2 &&
+                 Math.abs(Number(tp.y) - Number(t.y)) < 2;
+        });
+        if (!hasSupport) {
+          return { ok: false, msg: "悬空" };
+        }
+      }
+    }
+    
+    return { ok: true, msg: "合规" };
+  }
+
+  function syncToggle(checkboxId, val) {
+    const el = document.getElementById(checkboxId);
+    if (el) {
+      el.checked = val;
+    }
+  }
+
+  // Register keyboard shortcuts: Ctrl+S or Cmd+S for quick background save
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      saveToTemplates(true);
+    }
+  });
+
+  // Initialize dynamic configuration and load templates on load
+  init().then(() => {
+    // Sync theme choice from localStorage
+    const savedTheme = localStorage.getItem('editor_theme');
+    if (savedTheme === 'modern') {
+      document.body.classList.add('theme-modern');
+      const btn = document.getElementById('themeToggleBtn');
+      if (btn) {
+        btn.textContent = "返回旧版布局";
+        btn.style.borderColor = '#8e8e9f';
+        btn.style.color = '#8e8e9f';
+      }
+      
+      const content = document.getElementById('exportConsoleContent');
+      if (content) {
+        content.style.display = 'none';
+      }
+    }
+    
+    // Always build the explorer list, so it's ready when theme is toggled
+    rebuildExplorer();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const templateParam = urlParams.get('template');
+    if (templateParam) {
+      const selector = document.getElementById('templateSelector');
+      if (allLoadedTemplates[templateParam]) {
+        selector.value = templateParam;
+        loadSelectedTemplate();
+      }
+    }
+  });
+</script>
+</body>
+</html>

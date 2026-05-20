@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Upload and Analyze BoardTemplates.json</title>
+<style>
+  body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #fff; }
+  h1 { color: #ffd32a; }
+  #fileInput { margin: 20px 0; padding: 10px; background: #333; color: #fff; border: 1px solid #555; }
+  #result { white-space: pre-wrap; background: #2d2d2d; padding: 15px; border-radius: 5px; border: 1px solid #444; }
+</style>
+</head>
+<body>
+<h1>Upload and Analyze BoardTemplates.json</h1>
+<p>Please select the BoardTemplates.json file to analyze its grid bounds, layer parities, and same-layer overlaps.</p>
+<input type="file" id="fileInput">
+<div id="result">Waiting for file upload...</div>
+
+<script>
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const templates = JSON.parse(evt.target.result);
+      let totalTemplates = 0;
+      let outOfBoundsCount = 0;
+      let parityViolationsCount = 0;
+      let overlapCount = 0;
+      let details = '';
+
+      for (const [name, tiles] of Object.entries(templates)) {
+        totalTemplates++;
+        let hasOutOfBounds = false;
+        let hasParityViolation = false;
+        let hasOverlap = false;
+
+        // Check bounds (All layers share x: 0..10, y: 0..12 bounds)
+        for (const t of tiles) {
+          if (t.x < 0 || t.x > 10 || t.y < 0 || t.y > 12) {
+            hasOutOfBounds = true;
+          }
+        }
+
+        // Check parity (Disabled: same layer can contain mixed parities)
+        hasParityViolation = false;
+
+        // Check overlaps (dx < 2 && dy < 2 on the same layer)
+        for (let i = 0; i < tiles.length; i++) {
+          for (let j = i + 1; j < tiles.length; j++) {
+            if (tiles[i].layout === tiles[j].layout) {
+              const dx = Math.abs(tiles[i].x - tiles[j].x);
+              const dy = Math.abs(tiles[i].y - tiles[j].y);
+              if (dx < 2 && dy < 2) {
+                hasOverlap = true;
+              }
+            }
+          }
+        }
+
+        if (hasOutOfBounds || hasParityViolation || hasOverlap) {
+          if (hasOutOfBounds) outOfBoundsCount++;
+          if (hasParityViolation) parityViolationsCount++;
+          if (hasOverlap) overlapCount++;
+
+          details += `- **${name}**: `;
+          const errors = [];
+          if (hasOutOfBounds) errors.push('Out of bounds (x: 0..10, y: 0..12)');
+          if (hasParityViolation) errors.push('Parity violation');
+          if (hasOverlap) errors.push('Same-layer overlap (dx<2, dy<2)');
+          details += errors.join(', ') + '\n';
+        }
+      }
+
+      let summary = `Total templates analyzed: ${totalTemplates}\n`;
+      summary += `Templates with out of bounds: ${outOfBoundsCount}\n`;
+      summary += `Templates with parity violations: ${parityViolationsCount}\n`;
+      summary += `Templates with overlaps: ${overlapCount}\n\n`;
+      summary += `Detailed violations list:\n` + details;
+
+      document.getElementById('result').textContent = summary;
+    } catch (err) {
+      document.getElementById('result').textContent = 'Error parsing JSON: ' + err.message;
+    }
+  };
+  reader.readAsText(file);
+});
+</script>
+</body>
+</html>

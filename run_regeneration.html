@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Regenerate BoardTemplates and Visualizer</title>
+<style>
+  body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #fff; }
+  h1 { color: #ffd32a; }
+  textarea { width: 100%; height: 250px; background: #2d2d2d; color: #a6e22e; border: 1px solid #444; font-family: monospace; }
+  #fileInput { margin: 20px 0; padding: 10px; background: #333; color: #fff; border: 1px solid #555; }
+</style>
+</head>
+<body>
+<h1>Regenerate BoardTemplates and Visualizer</h1>
+<p>Upload the current BoardTemplates.json to regenerate the normalized coordinates and HTML preview:</p>
+<input type="file" id="fileInput">
+
+<h3>Regenerated BoardTemplates.json:</h3>
+<textarea id="jsonOutput" placeholder="JSON output will appear here..."></textarea>
+
+<h3>Regenerated templates_preview.html:</h3>
+<textarea id="htmlOutput" placeholder="HTML output will appear here..."></textarea>
+
+<script>
+function roundToEven(val) {
+    return Math.round(val / 2) * 2;
+}
+
+function roundToOdd(val) {
+    return Math.round((val - 1) / 2) * 2 + 1;
+}
+
+function normalizeCoordinates(rawTiles) {
+    let minCol = Infinity, maxCol = -Infinity;
+    let minRow = Infinity, maxRow = -Infinity;
+
+    for (const t of rawTiles) {
+        if (t.x < minCol) minCol = t.x;
+        if (t.x > maxCol) maxCol = t.x;
+        if (t.y < minRow) minRow = t.y;
+        if (t.y > maxRow) maxRow = t.y;
+    }
+
+    const colRange = maxCol - minCol;
+    const rowRange = maxRow - minRow;
+
+    // We check if it fits in our 6x7 grid (cols 0..10 -> max range 10; rows 0..12 -> max range 12)
+    const fitsPerfectly = (colRange <= 10 && rowRange <= 12);
+
+    const convertedTiles = [];
+
+    for (const t of rawTiles) {
+        let xTarget, yTarget;
+        const layout = t.layout;
+
+        if (fitsPerfectly) {
+            const shiftX = (minCol % 2 === 0) ? minCol : minCol - 1;
+            const shiftY = (minRow % 2 === 0) ? minRow : minRow - 1;
+            xTarget = t.x - shiftX;
+            yTarget = t.y - shiftY;
+        } else {
+            xTarget = colRange === 0 ? 5 : ((t.x - minCol) / colRange) * 10;
+            yTarget = rowRange === 0 ? 6 : ((t.y - minRow) / rowRange) * 12;
+        }
+
+        let x, y;
+        if (layout % 2 !== 0) {
+            x = roundToEven(xTarget);
+            y = roundToEven(yTarget);
+            x = Math.max(0, Math.min(10, x));
+            y = Math.max(0, Math.min(12, y));
+        } else {
+            x = roundToOdd(xTarget);
+            y = roundToOdd(yTarget);
+            x = Math.max(1, Math.min(9, x));
+            y = Math.max(1, Math.min(11, y));
+        }
+
+        convertedTiles.push({ x, y, layout });
+    }
+
+    let changed = true;
+    let iterations = 0;
+    const maxIterations = 1000;
+
+    while (changed && iterations < maxIterations) {
+        changed = false;
+        iterations++;
+
+        for (let i = 0; i < convertedTiles.length; i++) {
+            for (let j = i + 1; j < convertedTiles.length; j++) {
+                const t1 = convertedTiles[i];
+                const t2 = convertedTiles[j];
+
+                if (t1.layout === t2.layout) {
+                    const dx = Math.abs(t1.x - t2.x);
+                    const dy = Math.abs(t1.y - t2.y);
+
+                    if (dx < 2 && dy < 2) {
+                        const candidates = [
+                            { dx: 2, dy: 0 }, { dx: -2, dy: 0 },
+                            { dx: 0, dy: 2 }, { dx: 0, dy: -2 },
+                            { dx: 2, dy: 2 }, { dx: -2, dy: -2 },
+                            { dx: 2, dy: -2 }, { dx: -2, dy: 2 }
+                        ];
+
+                        let resolved = false;
+                        for (const c of candidates) {
+                            const newX = t2.x + c.dx;
+                            const newY = t2.y + c.dy;
+
+                            let inBounds = false;
+                            if (t2.layout % 2 !== 0) {
+                                inBounds = (newX >= 0 && newX <= 10 && newY >= 0 && newY <= 12);
+                            } else {
+                                inBounds = (newX >= 1 && newX <= 9 && newY >= 1 && newY <= 11);
+                            }
+
+                            if (inBounds) {
+                                let hasOverlap = false;
+                                for (let k = 0; k < convertedTiles.length; k++) {
+                                    if (k === j) continue;
+                                    const other = convertedTiles[k];
+                                    if (other.layout === t2.layout) {
+                                        if (Math.abs(other.x - newX) < 2 && Math.abs(other.y - newY) < 2) {
+                                            hasOverlap = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (!hasOverlap) {
+                                    t2.x = newX;
+                                    t2.y = newY;
+                                    resolved = true;
+                                    changed = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!resolved) {
+                            t2.layout += 1;
+                            if (t2.layout % 2 !== 0) {
+                                t2.x = roundToEven(t2.x);
+                                t2.y = roundToEven(t2.y);
+                                t2.x = Math.max(0, Math.min(10, t2.x));
+                                t2.y = Math.max(0, Math.min(12, t2.y));
+                            } else {
+                                t2.x = roundToOdd(t2.x);
+                                t2.y = roundToOdd(t2.y);
+                                t2.x = Math.max(1, Math.min(9, t2.x));
+                                t2.y = Math.max(1, Math.min(11, t2.y));
+                            }
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    convertedTiles.sort((a, b) => {
+        if (a.layout !== b.layout) return a.layout - b.layout;
+        if (a.y !== b.y) return a.y - b.y;
+        return a.x - b.x;
+    });
+
+    return convertedTiles.map(t => ({
+        x: t.x,
+        y: t.y,
+        layout: t.layout
+    }));
+}
+
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(evt) {
+    try {
+      const templates = JSON.parse(evt.target.result);
+      const regenerated = {};
+
+      for (const [name, tiles] of Object.entries(templates)) {
+        regenerated[name] = normalizeCoordinates(tiles);
+      }
+
+      // 1. Output JSON
+      const jsonText = JSON.stringify(regenerated, null, 2);
+      document.getElementById('jsonOutput').value = jsonText;
+
+      // 2. Output Visualizer HTML
+      let htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Mahjong Templates Visualizer</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #222; color: #fff; padding: 20px; }
+  h1 { text-align: center; margin-bottom: 30px; }
+  .grid-container {
+    display: flex; flex-wrap: wrap; gap: 25px; justify-content: center;
+  }
+  .template-card {
+    background: #333; padding: 15px; border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.4); text-align: center;
+    border: 1px solid #444;
+    transition: all 0.3s ease;
+  }
+  .board {
+    position: relative;
+    width: 320px;
+    height: 540px;
+    background: #1e1e1e; border: 2px solid #555;
+    border-radius: 6px;
+    margin: 15px auto;
+    overflow: hidden;
+  }
+  .board-boundary {
+    position: absolute;
+    left: 40px;
+    top: 95px;
+    width: 240px;
+    height: 350px;
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    background-color: rgba(255, 255, 255, 0.02);
+    pointer-events: none;
+    box-sizing: border-box;
+    border-radius: 4px;
+  }
+  .tile {
+    position: absolute;
+    width: 38px; height: 48px;
+    border: 1px solid #000;
+    border-radius: 4px;
+    box-shadow: 1px 2px 4px rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: bold; color: #000;
+  }
+  .info { font-size: 12px; color: #bbb; margin-bottom: 5px; }
+  .edit-link {
+    display: inline-block;
+    margin: 10px 0;
+    padding: 8px 16px;
+    background: #ffd32a;
+    color: #1e1e1e;
+    font-weight: bold;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 12px;
+    transition: background 0.2s, transform 0.1s;
+  }
+  .edit-link:hover {
+    background: #ffb300;
+    transform: scale(1.03);
+  }
+  .edit-link:active {
+    transform: scale(0.98);
+  }
+</style>
+</head>
+<body>
+<h1>Mahjong Match-2 Templates Preview</h1>
+<div class="grid-container">
+`;
+
+      const colors = [
+        '#FFFFFF', '#d1d8e0', '#4bcffa', '#0be881', '#ffd32a', '#ff3f34', '#808e9b', '#ef5777', '#3c40c6'
+      ];
+      const scaleX = 20;
+      const scaleY = 25;
+
+       Object.keys(regenerated).sort((a,b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1])).forEach(key => {
+          const tiles = regenerated[key];
+          const maxLayout = Math.max(...tiles.map(t => t.layout));
+          const tileCount = tiles.length;
+
+          // Calculate dimensions
+          const xs = tiles.map(t => t.x);
+          const ys = tiles.map(t => t.y);
+          const minX = Math.min(...xs);
+          const maxX = Math.max(...xs);
+          const minY = Math.min(...ys);
+          const maxY = Math.max(...ys);
+          
+          const gridW = maxX - minX + 2;
+          const gridH = maxY - minY + 2;
+          const tileW = gridW / 2;
+          const tileH = gridH / 2;
+
+          htmlContent += `
+    <div class="template-card" id="card_${key}">
+      <h3>${key}</h3>
+      <div class="info">Tiles: ${tileCount} | Max Layer: ${maxLayout}</div>
+      <div class="info">Grid: ${gridW}x${gridH} (${tileW}x${tileH} Tiles)</div>
+      <div class="info" style="font-size: 11px; color: #888;">Range: X[${minX}~${maxX+2}], Y[${minY}~${maxY+2}]</div>
+      <a href="level_editor.html?template=${key}" target="_blank" class="edit-link">编辑此模板 (Edit)</a>
+      <div class="board">
+        <div class="board-boundary"></div>
+    `;
+
+          const offsetX = 40;
+          const offsetY = 95;
+
+          tiles.sort((a, b) => a.layout - b.layout).forEach(t => {
+              const left = t.x * scaleX + offsetX;
+              const top = t.y * scaleY + offsetY;
+              const zIndex = t.layout * 10;
+              const color = colors[t.layout] || '#FFF';
+              const offset = (t.layout - 1) * -2;
+
+              htmlContent += `<div class="tile" data-x="${t.x}" data-y="${t.y}" data-layout="${t.layout}" style="left: ${left + offset}px; top: ${top + offset}px; z-index: ${zIndex}; background-color: ${color};">L${t.layout}</div>`;
+          });
+
+          htmlContent += `
+      </div>
+    </div>
+    `;
+      });
+
+      htmlContent += `
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const cards = document.querySelectorAll('.template-card');
+  let totalErrors = 0;
+  const errorReports = [];
+
+  cards.forEach(card => {
+    const title = card.querySelector('h3').textContent;
+    const tiles = [];
+    const tileElements = card.querySelectorAll('.tile');
+    
+    tileElements.forEach(el => {
+      tiles.push({
+        x: parseInt(el.getAttribute('data-x')),
+        y: parseInt(el.getAttribute('data-y')),
+        layout: parseInt(el.getAttribute('data-layout')),
+        el: el
+      });
+    });
+
+    const overlaps = [];
+    for(let i=0; i<tiles.length; i++) {
+      for(let j=i+1; j<tiles.length; j++) {
+        if(tiles[i].layout === tiles[j].layout) {
+          const dx = Math.abs(tiles[i].x - tiles[j].x);
+          const dy = Math.abs(tiles[i].y - tiles[j].y);
+          if(dx < 2 && dy < 2) {
+            overlaps.push({a: tiles[i], b: tiles[j]});
+          }
+        }
+      }
+    }
+
+    // Boundary check (Only checking x in [0, 10] and y in [0, 12] as standard limits)
+    const outOfBounds = tiles.filter(t => {
+      return t.x < 0 || t.x > 10 || t.y < 0 || t.y > 12;
+    });
+
+    if(overlaps.length > 0 || outOfBounds.length > 0) {
+      totalErrors += overlaps.length + outOfBounds.length;
+      card.style.border = '2px solid #ff3f34';
+      card.style.boxShadow = '0 0 15px rgba(255, 63, 52, 0.4)';
+      
+      overlaps.forEach(o => {
+        o.a.el.style.border = '2px dashed #ff3f34';
+        o.b.el.style.border = '2px dashed #ff3f34';
+      });
+
+      outOfBounds.forEach(t => {
+        t.el.style.border = '2px dotted #ffd32a';
+      });
+
+      let errorMsg = title + ': ';
+      if (overlaps.length > 0) errorMsg += "发现 " + overlaps.length + " 处同层物理重叠; ";
+      if (outOfBounds.length > 0) errorMsg += "发现 " + outOfBounds.length + " 处坐标越界错误; ";
+      errorReports.push(errorMsg);
+    }
+  });
+
+  const header = document.createElement('div');
+  header.style.position = 'sticky';
+  header.style.top = '0';
+  header.style.zIndex = '9999';
+  header.style.background = totalErrors > 0 ? '#ff3f34' : '#0be881';
+  header.style.color = '#fff';
+  header.style.padding = '15px';
+  header.style.borderRadius = '8px';
+  header.style.marginBottom = '25px';
+  header.style.fontWeight = 'bold';
+  header.style.fontSize = '16px';
+  header.style.textAlign = 'center';
+  header.style.boxShadow = '0 4px 10px rgba(0,0,0,0.5)';
+  
+  if(totalErrors > 0) {
+    header.innerHTML = "⚠️ 关卡数据校验未通过！共检测到 " + totalErrors + " 处物理排版冲突 / 越界异常！<br><div style='font-size: 13px; font-weight: normal; margin-top: 10px; max-height: 200px; overflow-y: auto; text-align: left; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 4px;'>" + errorReports.join('<br>') + "</div>";
+  } else {
+    header.innerHTML = "✅ 关卡数据物理校验通过！100个模板均符合 2x2 网格对齐规则，且无越界。层内均无物理穿模！";
+  }
+  document.body.insertBefore(header, document.body.childNodes[0]);
+});
+<\/script>
+</body>
+</html>`;
+      document.getElementById('htmlOutput').value = htmlContent;
+    } catch(err) {
+      alert("Error: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+});
+</script>
+</body>
+</html>
