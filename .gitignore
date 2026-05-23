@@ -38,3 +38,7 @@ env/
 
 # Local environment configs (optional, but good practice if paths are customized)
 # data/config.json
+
+# Local data directory containing level configs
+data/
+
