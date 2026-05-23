@@ -1701,7 +1701,11 @@
   let viewMode = 'all'; // 'all', 'focus', 'current'
   let showLowerLayerRef = false; // Whether to show lower layer as reference in 'current' mode
 
+  let isSyncingViewMode = false;
   function setViewMode(mode) {
+    if (isSyncingViewMode) return;
+    isSyncingViewMode = true;
+
     viewMode = mode;
     document.querySelectorAll('.btn-view').forEach(btn => btn.classList.remove('active'));
     
@@ -1724,7 +1728,20 @@
       refGroupModern.style.display = (mode === 'current') ? 'flex' : 'none';
     }
     
+    // 联动逻辑：平的（仅看当前）显示十字线，3D（显示全部/聚焦当前）隐藏十字线
+    const showCrosshair = (mode === 'current');
+    syncToggle('crosshairToggle', showCrosshair);
+    syncToggle('crosshairToggleModern', showCrosshair);
+    const vLine = document.getElementById('crosshair-v');
+    const hLine = document.getElementById('crosshair-h');
+    if (vLine && hLine) {
+      const display = showCrosshair ? 'block' : 'none';
+      vLine.style.display = display;
+      hLine.style.display = display;
+    }
+
     renderTiles();
+    isSyncingViewMode = false;
   }
 
   function toggleLowerLayerRef(visible) {
@@ -1743,6 +1760,15 @@
       const display = visible ? 'block' : 'none';
       vLine.style.display = display;
       hLine.style.display = display;
+    }
+
+    // 联动逻辑：勾选十字线（平）切换到仅看当前，取消十字线（3D）切换到显示全部
+    if (!isSyncingViewMode) {
+      if (visible) {
+        setViewMode('current');
+      } else {
+        setViewMode('all');
+      }
     }
   }
 
@@ -1769,8 +1795,11 @@
     const left = aligned.x * 41 + 1;
     const top = aligned.y * 41 + 1;
     
-    ghost.style.left = `${left}px`;
-    ghost.style.top = `${top}px`;
+    // Apply offset for 3D stacking effect (only when showing multiple layers)
+    const stackOffset = (viewMode === 'current') ? 0 : (currentLayer - 1) * -4;
+    
+    ghost.style.left = `${left + stackOffset}px`;
+    ghost.style.top = `${top + stackOffset}px`;
     
     // Check if it overlaps with any existing tile on the same layer
     const isOverlapping = activeTiles.some(t => 
@@ -1955,7 +1984,7 @@
       
       // Apply offset for 3D stacking effect (only when showing multiple layers)
       const stackOffset = (viewMode === 'current') ? 0 : (t.layout - 1) * -4;
-      
+
       tileEl.style.left = `${left + stackOffset}px`;
       tileEl.style.top = `${top + stackOffset}px`;
       tileEl.style.zIndex = isLowerRef ? zIndex - 5 : zIndex; // Reference tiles sit slightly below current layer tiles visually
@@ -2544,6 +2573,9 @@
         loadSelectedTemplate();
       }
     }
+    
+    // 初始化同步视图模式，确保十字线与3D状态在启动时正确同步
+    setViewMode(viewMode);
   });
 </script>
 </body>
