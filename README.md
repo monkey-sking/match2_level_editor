@@ -95,20 +95,28 @@ If you edit this file, the Editor UI, server port, boundary validation, colors, 
 
 ### 📐 Design Philosophy & Pipeline
 
-#### 1. Level Difficulty Curve Loop
-- **Cycle Structure**: Starts at **Level 4** (Levels 1-3 are beginner tutorial stages, exempt from difficulty rules). The difficulty flows in a 3-level cycle:
-  - **Level 3N + 1**: Easy (Target Variety $M = 3$ or $4$)
-  - **Level 3N + 2**: Medium (Target Variety $M = 4$ or $5$)
-  - **Level 3N**: Hard (Target Variety $M = 5$ or $6$)
-- **Difficulty Grading Classifier**: Calculates a score based on a layout base factor and active card types variety count ($Score = BaseFactor \times M$):
+#### 1. Level Difficulty Curve Progression
+- **Monotonic Progression**: Starts at **Level 4** (Levels 1-3 are beginner tutorial stages, exempt from difficulty rules). The overall difficulty follows a smooth, monotonically increasing difficulty curve based on sorting the board templates by their base difficulty factor.
+- **Card Types Variety Progression ($M$)**: Ramps up in progressive stages rather than looping:
+  - **Level 1-3 (Tutorial)**: $M = 2$
+  - **Level 4-5 (Easy Start)**: $M = 3$ (`Wan, Feng, Bing`)
+  - **Level 6-9 (Progression)**: $M = 4$ (`Wan, Feng, Bing, Tiao`)
+  - **Level 10-20 (Card Point/Medium)**: $M = 5$ (`Wan, Feng, Bing, Tiao, Qi`)
+  - **Level 21-200 (Core/Hard)**: $M = 6$ (`Wan, Feng, Bing, Tiao, Qi, Hua`)
+- **Difficulty Grading Score Formula**: Calculates a score based on a layout base factor and active card types variety count ($Score = BaseFactor \times M$):
   - $BaseFactor = \frac{N}{F} \times (1 + 0.15 \times L)$, where $N$ is total cards count, $F$ is initially accessible cards count (free tiles with no coverage from above), and $L$ is max layers.
-  - $Score < 50 \implies \text{Easy}$
-  - $50 \le Score < 90 \implies \text{Medium}$
-  - $Score \ge 90 \implies \text{Hard}$
+  - $Score \le 10 \implies \text{Very Easy}$
+  - $10 < Score \le 30 \implies \text{Easy}$
+  - $30 < Score \le 50 \implies \text{Medium}$
+  - $50 < Score \le 80 \implies \text{Hard}$
+  - $Score > 80 \implies \text{Very Hard}$
 
 #### 2. Playability Safeguards ($F \ge 12$)
-- To prevent early-game lockups / deadlocks where too few cards can be cleared initially in higher difficulty levels, all **Medium** and **Hard** levels enforce a minimum of 12 free tiles at layout start ($F \ge 12$).
+- To prevent early-game lockups / deadlocks where too few cards can be cleared initially, all levels enforce a minimum of 12 free tiles at layout start ($F \ge 12$).
 - Handcrafted templates with $F < 12$ are automatically adjusted symmetrically by trimming upper layers until the criteria is met. Procedurally generated levels filter and discard any layouts violating this threshold.
+
+#### 3. Backside Cards Layer Explicit Configuration
+- **Explicit Z-Coordinates**: The `backSpawnPos` coordinates in `level.xlsx` are configured as `x,y,layer` (Vector3). The Z component explicitly specifies the layer to ensure correct matching and visualization in the 3D grid, solving bottom-layer coverage issues.
 
 #### 3. Code & Data Repository Isolation
 - **Public Code Repository** (`match2_level_editor`): Contains the web GUI editor, visualizer generator, Excel compiler scripts, and conversion utilities.
@@ -229,20 +237,28 @@ node Export-ToExcel.js; node Generate-Visualizer.js
 
 ### 📐 设计思路与构建管道
 
-#### 1. 关卡难度波形循环
-- **循环机制**：从**第 4 关**开始进行难度循环（1-3 关为新手引导教学关，免除难度校验）。关卡难度以 3 关为一个周期呈波浪式循环流动：
-  - **第 3N + 1 关**：Easy 简单 (卡牌花色数 $M = 3$ 或 $4$)
-  - **第 3N + 2 关**：Medium 中等 (卡牌花色数 $M = 4$ 或 $5$)
-  - **第 3N 关**：Hard 困难 (卡牌花色数 $M = 5$ 或 $6$)
+#### 1. 关卡难度单调递增波形
+- **单调递增波形**：从**第 4 关**开始按单调递增方式进行关卡排列（1-3 关为新手引导教学关，免除难度校验）。关卡模板根据基础难度系数进行升序排序，使关卡体验随进度平滑变难。
+- **花色数量（$M$）阶梯式引入机制**：取代了以往的简单循环，采用阶梯式引入，逐步丰富游戏元素：
+  - **第 1-3 关（新手教学）**：$M = 2$
+  - **第 4-5 关（起步）**：$M = 3$ (`Wan, Feng, Bing`)
+  - **第 6-9 关（进阶）**：$M = 4$ (`Wan, Feng, Bing, Tiao`)
+  - **第 10-20 关（中级/卡点）**：$M = 5$ (`Wan, Feng, Bing, Tiao, Qi`)
+  - **第 21-200 关（核心玩法）**：$M = 6$ (`Wan, Feng, Bing, Tiao, Qi, Hua`)
 - **难度评价公式**：基于棋盘排版复杂度与花色数量综合评分 ($Score = BaseFactor \times M$)：
   - $BaseFactor = \frac{N}{F} \times (1 + 0.15 \times L)$，其中 $N$ 为总卡牌数，$F$ 为初始可点选的空闲牌数（即上方无遮挡的牌），$L$ 为最大图层层数。
-  - $Score < 50 \implies \text{Easy}$
-  - $50 \le Score < 90 \implies \text{Medium}$
-  - $Score \ge 90 \implies \text{Hard}$
+  - $Score \le 10 \implies \text{Very Easy 极简}$
+  - $10 < Score \le 30 \implies \text{Easy 简单}$
+  - $30 < Score \le 50 \implies \text{Medium 中等}$
+  - $50 < Score \le 80 \implies \text{Hard 困难}$
+  - $Score > 80 \implies \text{Very Hard 极难}$
 
 #### 2. 可玩性安全阀 ($F \ge 12$ 开启牌数校验)
-- 为了防止在中高难度关卡中由于开局可消除的牌太少而导致死局或极早卡关，所有的 **Medium** 和 **Hard** 关卡在初始状态下必须包含至少 12 张可点选的空闲牌 ($F \ge 12$)。
-- 对于手工作业的模板，若被评估为 Medium/Hard 且 $F < 12$，算法会沿着对称轴自动裁剪最上层卡牌，直至满足 $F \ge 12$；对于算法自动生成的关卡，任何不满足此阈值的排版均会被直接过滤舍弃。
+- 为了防止开局可消除的牌太少而导致死局或极早卡关，所有的关卡在初始状态下必须包含至少 12 张可点选的空闲牌 ($F \ge 12$)。
+- 对于手工作业的模板，若被评估且 $F < 12$，算法会沿着对称轴自动裁剪最上层卡牌，直至满足 $F \ge 12$；对于算法自动生成的关卡，任何不满足此阈值的排版均会被直接过滤舍弃。
+
+#### 3. 背面卡牌图层显式配置
+- **三维图层定位**：在 `level.xlsx` 配置中，`backSpawnPos` 从二维坐标升级为三维坐标 `x,y,layer` (Vector3)。Z轴组件显式指定背面牌所在的图层，确保客户端的精确层级匹配，彻底避免背面卡牌被上层普通牌压死的问题。
 
 #### 3. 代码与数据仓库隔离
 - **公开代码仓库** (`match2_level_editor`)：仅托管网页 GUI 编辑器前端、可视化页面生成器、Excel 编译脚本以及转换工具等通用代码工具。

@@ -205,6 +205,41 @@
     box-shadow: 0 1px 3px rgba(0,0,0,0.3);
   }
 
+  .board-tile.backside-tile {
+    box-shadow: 0 0 0 2px #ff4d4d inset, 2px 4px 8px rgba(0,0,0,0.7);
+  }
+
+  .board-tile.backside-tile::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 4px;
+    background: 
+      linear-gradient(to top right, transparent 48%, #ff4d4d 49%, #ff4d4d 51%, transparent 52%),
+      linear-gradient(to top left, transparent 48%, #ff4d4d 49%, #ff4d4d 51%, transparent 52%);
+    background-repeat: no-repeat;
+    opacity: 0.75;
+    pointer-events: none;
+  }
+
+  .backside-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background-color: #ff4d4d;
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-weight: 800;
+    pointer-events: none;
+    line-height: 1;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+
   /* Ghost/placement outline preview */
   .placement-ghost {
     position: absolute;
@@ -961,6 +996,12 @@
 </head>
 <body>
 
+<div id="dataLoadWarning" style="display:none; background:#ff3f34; color:#fff; padding:10px 20px; font-size:13px; font-weight:bold; text-align:center; position:sticky; top:0; z-index:99999; box-shadow:0 2px 10px rgba(0,0,0,0.3); justify-content:center; align-items:center; gap:15px;">
+  <span>⚠️ 自动加载 BoardTemplates.json 数据失败（可能是因为以本地文件形式打开）。请运行 start_server.bat 并在 http://localhost:8080/level_editor.html 中编辑，或在此处手动导入：</span>
+  <button onclick="document.getElementById('manualFileInput').click()" style="background:#fff; color:#1e1e1e; border:none; padding:5px 12px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:12px; transition:opacity 0.2s;">📁 导入 BoardTemplates.json</button>
+  <input type="file" id="manualFileInput" accept=".json" style="display:none;" onchange="handleManualImport(this)">
+</div>
+
 <header>
   <div>
     <h1 class="classic-only">Match-2 Level Layout Editor</h1>
@@ -970,6 +1011,7 @@
   <div style="display: flex; gap: 10px; align-items: center;">
     <button class="btn" id="themeToggleBtn" onclick="toggleTheme()" style="border-color: var(--accent); color: var(--accent); font-weight: 700;">✨ 体验新版布局</button>
     <button class="btn btn-danger" onclick="clearBoard()">清空画布</button>
+    <button class="btn" onclick="openLevelPreview()" style="border-color:#4bcffa;color:#4bcffa;font-weight:700;" title="查看哪些关卡使用了当前棋盘模板">📋 查看关卡引用</button>
     <button class="btn btn-accent" onclick="saveToTemplates()">保存到 BoardTemplates.json</button>
   </div>
 </header>
@@ -986,6 +1028,14 @@
     </div>
     <div class="explorer-search-box">
       <input type="text" id="explorerSearch" placeholder="🔍 快速过滤查找关卡..." oninput="filterExplorerList()">
+    </div>
+    <div class="explorer-filter-row" style="display: flex; gap: 6px; padding: 0 12px 10px 12px;">
+      <select id="explorerProjectFilter" onchange="onFilterChange()" style="flex: 1; padding: 6px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 12px; outline: none; cursor: pointer;">
+        <option value="">全部项目</option>
+      </select>
+      <select id="explorerModeFilter" onchange="onFilterChange()" style="flex: 1; padding: 6px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 12px; outline: none; cursor: pointer;">
+        <option value="">全部模式</option>
+      </select>
     </div>
     <div class="explorer-list" id="explorerList">
       <!-- Populated via Javascript -->
@@ -1031,6 +1081,12 @@
           </span>
           <span>底支撑参照</span>
         </label>
+      </div>
+
+      <div class="toolbar-divider"></div>
+
+      <div class="toolbar-section">
+        <button class="btn btn-sm" onclick="openLevelPreview()" style="border-color:#4bcffa;color:#4bcffa;font-weight:700;white-space:nowrap" title="查看哪些关卡使用了当前棋盘模板">📋 关卡引用</button>
       </div>
     </div>
 
@@ -1090,6 +1146,19 @@
       <div class="control-label">编辑活动图层</div>
       <div class="layer-selector" id="layerSelector">
         <!-- Will be populated dynamically from config.json -->
+      </div>
+    </div>
+
+    <!-- Backside Visualizer Selector -->
+    <div class="control-group">
+      <div class="control-label">背面牌参考显示 (只读)</div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <select id="editorBacksideSelector" onchange="changeBacksideReference(this.value)" style="width: 100%; padding: 8px; border-radius: 4px; background: #23232c; border: 1px solid #383847; color: #fff; font-size: 13px; outline: none;">
+          <option value="">-- 不显示背面 --</option>
+        </select>
+        <div id="editorBacksideInfo" style="font-size: 11px; color: var(--text-muted); line-height: 1.4; display: none; margin-top: 4px;">
+          当前关联关卡背面牌总数: <span id="editorBacksideCount" style="color: #ff4d4d; font-weight: bold;">0</span> 张
+        </div>
       </div>
     </div>
 
@@ -1231,8 +1300,56 @@
   let allLoadedTemplates = {};
   let sortedTemplateKeys = [];
   let loadedTemplateName = "";
+  let templateUsages = {};
+  let editorBackSpawnArray = [];
 
   let isDirty = false;
+
+  function updateWorkspaceTitle() {
+    const lvlTitle = document.getElementById('canvasLevelTitle');
+    if (!lvlTitle) return;
+    
+    const name = loadedTemplateName || '未命名模板';
+    const usages = templateUsages[name];
+    
+    const selProj = document.getElementById('explorerProjectFilter') ? document.getElementById('explorerProjectFilter').value : "";
+    const selMode = document.getElementById('explorerModeFilter') ? document.getElementById('explorerModeFilter').value : "";
+    
+    const filteredUsages = usages.filter(u => {
+      if (selProj && u.project !== selProj) return false;
+      if (selMode && u.mode !== selMode) return false;
+      return true;
+    });
+
+    let usageHtml = '';
+    if (filteredUsages.length > 0) {
+      usageHtml = filteredUsages.map(u => `
+        <span style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:bold; color:#111; background:${u.color || '#555'}; padding:2px 8px; border-radius:4px; margin-left:8px;" title="${u.project} - ${u.mode}">
+          ${u.project}·${u.mode} [${u.levels.map(l => typeof l === 'object' ? l.id : l).join(', ')}]
+        </span>
+      `).join('');
+    } else {
+      usageHtml = `<span style="font-size:11px; font-weight:normal; color:var(--text-muted); font-style:italic; margin-left:8px;">(在筛选的项目/模式中未被使用)</span>`;
+    }
+    
+    const unsavedStar = isDirty ? `<span class="unsaved-star" style="color: #ff3f34; font-weight: bold; margin-left: 4px;" title="有未保存的更改">*</span>` : '';
+    
+    lvlTitle.innerHTML = `<div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+      <span>排版编辑工作台 (${name})${unsavedStar}</span>
+      <div style="display:inline-flex; flex-wrap:wrap; gap:4px; align-items:center;">
+        ${usageHtml}
+      </div>
+    </div>`;
+  }
+
+  // 打开关卡配置预览，并传入当前棋盘 boardId 作为 URL 参数
+  function openLevelPreview() {
+    const name = loadedTemplateName; // e.g. "template_5"
+    const match = name && name.match(/template_(\d+)/);
+    const boardId = match ? match[1] : '';
+    const url = 'level_config_preview.html' + (boardId ? '?boardId=' + boardId : '');
+    window.open(url, '_blank');
+  }
 
   function setDirty(val) {
     isDirty = val;
@@ -1240,16 +1357,7 @@
   }
 
   function updateUnsavedStatus() {
-    const lvlTitle = document.getElementById('canvasLevelTitle');
-    const name = loadedTemplateName || '未命名模板';
-    
-    if (lvlTitle) {
-      if (isDirty) {
-        lvlTitle.innerHTML = `排版编辑工作台 (${name}) <span class="unsaved-star" style="color: #ff3f34; font-weight: bold; margin-left: 4px;" title="有未保存的更改">*</span>`;
-      } else {
-        lvlTitle.textContent = `排版编辑工作台 (${name})`;
-      }
-    }
+    updateWorkspaceTitle();
     
     // Update browser document title
     if (isDirty) {
@@ -1460,6 +1568,16 @@
   // Load existing templates on initialization
   async function loadTemplatesList() {
     try {
+      try {
+        const uRes = await fetch('/api/template-usage?t=' + Date.now());
+        if (uRes.ok) {
+          templateUsages = await uRes.json();
+          populateFilterDropdowns();
+        }
+      } catch (e) {
+        console.warn("Could not load template usages:", e);
+      }
+
       const response = await fetch('/data/BoardTemplates.json');
       if (response.ok) {
         allLoadedTemplates = await response.json();
@@ -1484,11 +1602,70 @@
         if (typeof rebuildExplorer === 'function') {
           rebuildExplorer();
         }
+      } else {
+        throw new Error('Response code ' + response.status);
       }
     } catch (e) {
       console.warn("Could not load templates list automatically.", e);
+      // Show warning banner in case of failure
+      const banner = document.getElementById('dataLoadWarning');
+      if (banner) {
+        banner.style.display = 'flex';
+      }
     }
   }
+
+  // 手动导入模板数据
+  window.handleManualImport = function(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        if (typeof parsed !== 'object' || parsed === null) {
+          throw new Error('导入的不是有效的 JSON 对象');
+        }
+        allLoadedTemplates = parsed;
+        const selector = document.getElementById('templateSelector');
+        selector.innerHTML = '<option value="">-- 选择模板 --</option>';
+        
+        sortedTemplateKeys = Object.keys(allLoadedTemplates)
+          .sort((a,b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
+          
+        sortedTemplateKeys.forEach(key => {
+          const opt = document.createElement('option');
+          opt.value = key;
+          opt.textContent = `${key} (${allLoadedTemplates[key].length} 张牌)`;
+          selector.appendChild(opt);
+        });
+        
+        const banner = document.getElementById('dataLoadWarning');
+        if (banner) banner.style.display = 'none';
+        
+        showToast("模板数据导入成功！", "success");
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const templateParam = urlParams.get('template');
+        if (templateParam && allLoadedTemplates[templateParam]) {
+          selector.value = templateParam;
+          loadSelectedTemplate();
+        } else {
+          if (sortedTemplateKeys.length > 0) {
+            selector.value = sortedTemplateKeys[0];
+            loadSelectedTemplate();
+          }
+        }
+
+        if (typeof rebuildExplorer === 'function') {
+          rebuildExplorer();
+        }
+      } catch (err) {
+        showToast("解析 BoardTemplates.json 失败：" + err.message, "error");
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Load template details
   function loadSelectedTemplate() {
@@ -1528,10 +1705,10 @@
       showToast(`已成功加载 ${selectedKey}！`, 'success');
       
       // Update workspace header title
-      const lvlTitle = document.getElementById('canvasLevelTitle');
-      if (lvlTitle) {
-        lvlTitle.innerHTML = `排版编辑工作台 (${selectedKey})`;
-      }
+      updateWorkspaceTitle();
+      
+      // Populate backside selector options
+      populateBacksideSelector(selectedKey);
       
       // Sync active explorer list item
       document.querySelectorAll('.explorer-item').forEach(el => {
@@ -2007,6 +2184,12 @@
         tileEl.classList.add('floating-tile');
       }
 
+      // Check if this tile is a backside tile
+      const isBack = editorBackSpawnArray.some(bp => bp.x === t.x && bp.y === t.y);
+      if (isBack && !isLowerRef) {
+        tileEl.classList.add('backside-tile');
+      }
+
       // Disable pointer interaction for other layers so they are click-through
       if (!isCurrent) {
         tileEl.style.pointerEvents = 'none';
@@ -2026,6 +2209,9 @@
         tileEl.innerHTML = `<span style="font-size:10px; color:#444;">(${t.x},${t.y})</span><span style="font-size:12px;">L${t.layout}</span>`;
         if (isFloating) {
           tileEl.innerHTML += `<div class="floating-warning-badge" title="悬空：下方图层 L${t.layout - 1} 无支撑卡牌！">⚠️ 悬空</div>`;
+        }
+        if (isBack) {
+          tileEl.innerHTML += `<div class="backside-badge" title="背面牌">背面</div>`;
         }
       }
       
@@ -2366,10 +2552,21 @@
             showToast("自动构建管道连接失败！", "error");
           });
       } else {
-        showToast("后端保存出错，请确认 server.js 运行正常！", "error");
+        throw new Error('Save response status: ' + saveResponse.status);
       }
     } catch (e) {
-      showToast("连接本地服务器失败，请确保本地服务器启动中！", "error");
+      console.error("Save to backend failed:", e);
+      // Fallback: download JSON file!
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(allLoadedTemplates, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "BoardTemplates.json");
+      document.body.appendChild(downloadAnchor);
+      
+      showToast("⚠️ 无法保存到后台服务器（本地文件模式下不支持）。已自动生成下载文件，请将其覆盖放入项目中的 data/BoardTemplates.json 文件！", "error", 8000);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      setDirty(false);
     }
   }
 
@@ -2418,15 +2615,76 @@
   }
 
   // --- Explorer List Population and Searching ---
+  function populateFilterDropdowns() {
+    const projFilter = document.getElementById('explorerProjectFilter');
+    const modeFilter = document.getElementById('explorerModeFilter');
+    if (!projFilter || !modeFilter) return;
+    
+    const projectsSet = new Set();
+    const modesSet = new Set();
+    
+    Object.values(templateUsages).forEach(usages => {
+      usages.forEach(u => {
+        if (u.project) projectsSet.add(u.project);
+        if (u.mode) modesSet.add(u.mode);
+      });
+    });
+    
+    const lastProj = projFilter.value;
+    const lastMode = modeFilter.value;
+    
+    projFilter.innerHTML = '<option value="">全部项目</option>';
+    projectsSet.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = p;
+      projFilter.appendChild(opt);
+    });
+    
+    modeFilter.innerHTML = '<option value="">全部模式</option>';
+    modesSet.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m;
+      opt.textContent = m;
+      modeFilter.appendChild(opt);
+    });
+    
+    if (projectsSet.has(lastProj)) projFilter.value = lastProj;
+    if (modesSet.has(lastMode)) modeFilter.value = lastMode;
+  }
+
+  function onFilterChange() {
+    rebuildExplorer();
+    updateWorkspaceTitle();
+    populateBacksideSelector(loadedTemplateName);
+  }
+
   function rebuildExplorer() {
     const list = document.getElementById('explorerList');
     if (!list) return;
     
     list.innerHTML = '';
     
+    const searchVal = document.getElementById('explorerSearch') ? document.getElementById('explorerSearch').value.toLowerCase() : "";
+    const selProj = document.getElementById('explorerProjectFilter') ? document.getElementById('explorerProjectFilter').value : "";
+    const selMode = document.getElementById('explorerModeFilter') ? document.getElementById('explorerModeFilter').value : "";
+    
     sortedTemplateKeys.forEach(key => {
+      if (searchVal && !key.toLowerCase().includes(searchVal)) return;
+      
       const tiles = allLoadedTemplates[key];
       const validity = checkTemplateValidity(tiles);
+      const usages = templateUsages[key] || [];
+      
+      const filteredUsages = usages.filter(u => {
+        if (selProj && u.project !== selProj) return false;
+        if (selMode && u.mode !== selMode) return false;
+        return true;
+      });
+      
+      if ((selProj || selMode) && filteredUsages.length === 0) {
+        return;
+      }
       
       const item = document.createElement('div');
       item.className = 'explorer-item' + (key === loadedTemplateName ? ' active' : '');
@@ -2445,28 +2703,38 @@
       
       const statusClass = validity.ok ? 'status-pass' : 'status-fail';
       
+      let usageHtml = '';
+      if (filteredUsages.length > 0) {
+        usageHtml = `<div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; width:100%;">
+          ${filteredUsages.map(u => `
+            <span style="font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; color:#111; background:${u.color || '#555'}" title="${u.project} - ${u.mode}">
+              ${u.project}·${u.mode} [${u.levels.map(l => typeof l === 'object' ? l.id : l).join(',')}]
+            </span>
+          `).join('')}
+        </div>`;
+      } else {
+        usageHtml = `<div style="font-size:9px; color:var(--text-muted); margin-top:4px; font-style:italic;">未使用</div>`;
+      }
+      
+      item.style.flexDirection = 'column';
+      item.style.alignItems = 'stretch';
+      
       item.innerHTML = `
-        <div class="explorer-item-name">${key}</div>
-        <div class="explorer-item-meta">
-          <span class="explorer-item-count">${tiles ? tiles.length : 0}张</span>
-          <span class="explorer-item-status ${statusClass}">${validity.msg}</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+          <div class="explorer-item-name" style="font-weight:bold;">${key}</div>
+          <div class="explorer-item-meta">
+            <span class="explorer-item-count">${tiles ? tiles.length : 0}张</span>
+            <span class="explorer-item-status ${statusClass}">${validity.msg}</span>
+          </div>
         </div>
+        ${usageHtml}
       `;
       list.appendChild(item);
     });
   }
 
   function filterExplorerList() {
-    const query = document.getElementById('explorerSearch').value.toLowerCase();
-    const items = document.querySelectorAll('.explorer-item');
-    items.forEach(item => {
-      const name = item.dataset.key.toLowerCase();
-      if (name.includes(query)) {
-        item.style.display = 'flex';
-      } else {
-        item.style.display = 'none';
-      }
-    });
+    rebuildExplorer();
   }
 
   function updateExplorerActiveItem() {
@@ -2577,6 +2845,87 @@
     // 初始化同步视图模式，确保十字线与3D状态在启动时正确同步
     setViewMode(viewMode);
   });
+
+  // Backside Visualizer Functions
+  function populateBacksideSelector(selectedKey) {
+    const selector = document.getElementById('editorBacksideSelector');
+    if (!selector) return;
+    
+    selector.innerHTML = '<option value="">-- 不显示背面 --</option>';
+    
+    const infoDiv = document.getElementById('editorBacksideInfo');
+    if (infoDiv) infoDiv.style.display = 'none';
+    
+    editorBackSpawnArray = [];
+    
+    if (!selectedKey) return;
+    
+    const usages = templateUsages[selectedKey];
+    let firstOptionValue = null;
+    
+    const selProj = document.getElementById('explorerProjectFilter') ? document.getElementById('explorerProjectFilter').value : "";
+    const selMode = document.getElementById('explorerModeFilter') ? document.getElementById('explorerModeFilter').value : "";
+    
+    if (usages && usages.length > 0) {
+      usages.forEach(u => {
+        if (selProj && u.project !== selProj) return;
+        if (selMode && u.mode !== selMode) return;
+        
+        u.levels.forEach(lvl => {
+          const backSpawnPos = lvl.backSpawnPos || "";
+          const count = backSpawnPos ? backSpawnPos.split('|').length : 0;
+          
+          const opt = document.createElement('option');
+          const optVal = `${u.project}:${lvl.id}:${backSpawnPos}`;
+          opt.value = optVal;
+          opt.textContent = `${u.project}·${u.mode} [第 ${lvl.id} 关] (${count} 张背面牌)`;
+          selector.appendChild(opt);
+          
+          if (!firstOptionValue) {
+            firstOptionValue = optVal;
+          }
+        });
+      });
+    }
+    
+    if (firstOptionValue) {
+      selector.value = firstOptionValue;
+      changeBacksideReference(firstOptionValue);
+    }
+  }
+
+  function changeBacksideReference(value) {
+    const infoDiv = document.getElementById('editorBacksideInfo');
+    const countSpan = document.getElementById('editorBacksideCount');
+    
+    if (!value) {
+      editorBackSpawnArray = [];
+      if (infoDiv) infoDiv.style.display = 'none';
+      renderTiles();
+      return;
+    }
+    
+    const parts = value.split(':');
+    const project = parts[0];
+    const levelId = parts[1];
+    const backSpawnPos = parts[2] || "";
+    
+    if (backSpawnPos) {
+      editorBackSpawnArray = backSpawnPos.split('|').map(s => {
+        const coords = s.split(',').map(Number);
+        return { x: coords[0], y: coords[1] };
+      }).filter(p => !isNaN(p.x) && !isNaN(p.y));
+    } else {
+      editorBackSpawnArray = [];
+    }
+    
+    if (infoDiv && countSpan) {
+      infoDiv.style.display = 'block';
+      countSpan.textContent = editorBackSpawnArray.length;
+    }
+    
+    renderTiles();
+  }
 </script>
 </body>
 </html>

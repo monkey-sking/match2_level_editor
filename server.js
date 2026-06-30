@@ -40,6 +40,72 @@ const server = http.createServer((req, res) => {
   }
   let filePath = path.join(ROOT, urlPath);
 
+  // Handle API Endpoints (GET / POST requests)
+  if (urlPath === '/api/template-usage') {
+    try {
+      const XLSX = require('xlsx');
+      const projectsJsonPath = path.join(ROOT, 'data', 'projects.json');
+      if (!fs.existsSync(projectsJsonPath)) {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({}));
+        return;
+      }
+      const projectsCfg = JSON.parse(fs.readFileSync(projectsJsonPath, 'utf8'));
+      const usageMap = {}; // template_N -> [ { project, mode, color, levels: [] } ]
+
+      for (const proj of projectsCfg.projects) {
+        for (const cfg of proj.levelConfigs) {
+          const excelPath = path.join(proj.configDir, cfg.file);
+          if (!fs.existsSync(excelPath)) continue;
+
+          const wb = XLSX.readFile(excelPath);
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+          // Group by template keys
+          const tempLevels = {}; // boardId -> list of level objects
+          for (let i = 4; i < rows.length; i++) {
+            const r = rows[i];
+            if (r[1] == null) continue; // level id
+            const levelId = r[1];
+            const boardInStr = r[4];
+            const backSpawnPos = r[8] || "";
+            if (boardInStr) {
+              const boardIds = String(boardInStr).split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+              for (const bId of boardIds) {
+                if (!tempLevels[bId]) tempLevels[bId] = [];
+                tempLevels[bId].push({ id: levelId, backSpawnPos });
+              }
+            }
+          }
+
+          // Add to usageMap
+          for (const [bId, levels] of Object.entries(tempLevels)) {
+            const key = `template_${bId}`;
+            if (!usageMap[key]) usageMap[key] = [];
+            usageMap[key].push({
+              project: proj.name,
+              mode: cfg.label,
+              color: cfg.color,
+              levels: levels
+            });
+          }
+        }
+      }
+
+      res.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+      });
+      res.end(JSON.stringify(usageMap));
+    } catch (e) {
+      console.error("Error generating template-usage:", e);
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
   // Handle API Endpoints (POST requests)
   if (req.method === 'POST') {
     if (urlPath === '/api/save-templates') {
@@ -61,7 +127,7 @@ const server = http.createServer((req, res) => {
     }
     
     if (urlPath === '/api/run-pipeline') {
-      exec('node Export-ToExcel.js && node Generate-Visualizer.js', { cwd: ROOT }, (error, stdout, stderr) => {
+      exec('node Export-ToExcel.js && node Generate-Visualizer.js && node Generate-LevelPreview.js', { cwd: ROOT }, (error, stdout, stderr) => {
         if (error) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ success: false, error: error.message, stdout, stderr }));
@@ -93,7 +159,10 @@ const server = http.createServer((req, res) => {
       res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Server Error');
     } else {
-      res.writeHead(200, { 'Content-Type': contentType });
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0'
+      });
       res.end(content);
     }
   });

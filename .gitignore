@@ -42,3 +42,7 @@ env/
 # Local data directory containing level configs
 data/
 
+# Generated preview and scratch files
+level_config_preview.html
+scratch/
+

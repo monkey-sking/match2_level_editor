@@ -13,10 +13,10 @@ function buildLevelExcel() {
     const rules = JSON.parse(fs.readFileSync(levelRulesPath, 'utf8'));
     
     const rows = [
-        {"##var": "##var", "id": "id", "startId": "startId", "endId": "endId", "boardIn": "boardIn", "item": "item", "initItem": "initItem", "num": "num"},
-        {"##var": "##type", "id": "int", "startId": "int", "endId": "int", "boardIn": "(list#sep=,),int", "item": "(list#sep=,),item.EPlayItemType", "initItem": "(list#sep=,),int", "num": "int"},
-        {"##var": "##group", "id": "c", "startId": "c", "endId": "c", "boardIn": "c", "item": "c", "initItem": "c", "num": "c"},
-        {"##var": "##", "id": "这是自己的id", "startId": "开始关卡", "endId": "结束关卡", "boardIn": "包含模板", "item": "包含棋牌类型", "initItem": "必出现棋牌", "num": "必现牌数"}
+        {"##var": "##var", "id": "id", "startId": "startId", "endId": "endId", "boardIn": "boardIn", "item": "item", "initItem": "initItem", "num": "num", "backSpawnPos": "backSpawnPos"},
+        {"##var": "##type", "id": "int", "startId": "int", "endId": "int", "boardIn": "(list#sep=,),int", "item": "(list#sep=,),item.EPlayItemType", "initItem": "(list#sep=,),int", "num": "int", "backSpawnPos": "(list#sep=|),vector3"},
+        {"##var": "##group", "id": "c", "startId": "c", "endId": "c", "boardIn": "c", "item": "c", "initItem": "c", "num": "c", "backSpawnPos": "c"},
+        {"##var": "##", "id": "这是自己的id", "startId": "开始关卡", "endId": "结束关卡", "boardIn": "包含模板", "item": "包含棋牌类型", "initItem": "必出现棋牌", "num": "必现牌数", "backSpawnPos": "竖线|分隔 反面位置"}
     ];
 
     let idCounter = 1;
@@ -30,11 +30,12 @@ function buildLevelExcel() {
             "boardIn": boardIds.join(','),
             "item": rule.itemPool.join(','),
             "initItem": rule.initItem.join(','),
-            "num": rule.initNum
+            "num": rule.initNum,
+            "backSpawnPos": rule.backSpawnPos || ""
         });
     }
 
-    const ws = xlsx.utils.json_to_sheet(rows, { header: ["##var", "id", "startId", "endId", "boardIn", "item", "initItem", "num"], skipHeader: true });
+    const ws = xlsx.utils.json_to_sheet(rows, { header: ["##var", "id", "startId", "endId", "boardIn", "item", "initItem", "num", "backSpawnPos"], skipHeader: true });
     const wb = xlsx.utils.book_new();
     xlsx.utils.book_append_sheet(wb, ws, "Sheet1");
     xlsx.writeFile(wb, levelExcelPath);

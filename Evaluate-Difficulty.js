@@ -78,13 +78,13 @@ function run() {
     const score = Math.round(rawScore * 10) / 10;
     
     let grade = "";
-    if (score < 25) {
+    if (score <= 10) {
       grade = "极简 (Very Easy)";
-    } else if (score < 50) {
+    } else if (score <= 30) {
       grade = "简单 (Easy)";
-    } else if (score < 90) {
+    } else if (score <= 50) {
       grade = "中等 (Medium)";
-    } else if (score < 140) {
+    } else if (score <= 80) {
       grade = "困难 (Hard)";
     } else {
       grade = "极难 (Very Hard)";
