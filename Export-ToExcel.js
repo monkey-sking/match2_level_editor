@@ -54,7 +54,8 @@ function buildBoardExcel() {
 
     let idCounter = 1;
     for (const [key, tiles] of Object.entries(templates)) {
-        const boardId = parseInt(key.replace('template_', ''), 10);
+        const numMatch = (key.match(/\d+/) || [idCounter])[0];
+        const boardId = parseInt(numMatch, 10);
         let layoutMax = 0;
         for (const t of tiles) {
             if (t.layout > layoutMax) {
@@ -79,6 +80,23 @@ function buildBoardExcel() {
     xlsx.utils.book_append_sheet(wb, ws, "Sheet1");
     xlsx.writeFile(wb, boardExcelPath);
     console.log(`Generated ${boardExcelPath}`);
+
+    // Sync to projects defined in projects.json
+    try {
+        const projectsJsonPath = path.join(configDir, 'projects.json');
+        if (fs.existsSync(projectsJsonPath)) {
+            const projectsCfg = JSON.parse(fs.readFileSync(projectsJsonPath, 'utf8'));
+            for (const proj of projectsCfg.projects) {
+                if (proj.configDir && fs.existsSync(proj.configDir)) {
+                    const targetPath = path.join(proj.configDir, 'Board.xlsx');
+                    xlsx.writeFile(wb, targetPath);
+                    console.log(`Synced Board.xlsx to project ${proj.name}: ${targetPath}`);
+                }
+            }
+        }
+    } catch (err) {
+        console.warn("Could not sync Board.xlsx to projects:", err.message);
+    }
 }
 
 try {

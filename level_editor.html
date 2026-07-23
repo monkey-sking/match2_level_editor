@@ -1395,8 +1395,8 @@
 
   // 打开关卡配置预览，并传入当前棋盘 boardId 作为 URL 参数
   function openLevelPreview() {
-    const name = loadedTemplateName; // e.g. "template_5"
-    const match = name && name.match(/template_(\d+)/);
+    const name = loadedTemplateName; // e.g. "template_5" or "wx_level_5"
+    const match = name && name.match(/(\d+)/);
     const boardId = match ? match[1] : '';
     const url = 'level_config_preview.html' + (boardId ? '?boardId=' + boardId : '');
     window.open(url, '_blank');
@@ -1726,15 +1726,21 @@
   };
 
   // Load template details
-  function loadSelectedTemplate() {
-    const selectedKey = document.getElementById('templateSelector').value;
+  function loadSelectedTemplate(targetKey) {
+    const selector = document.getElementById('templateSelector');
+    let selectedKey = targetKey || (selector ? selector.value : '');
+    if (!selectedKey && loadedTemplateName) {
+      selectedKey = loadedTemplateName;
+    }
     if (!selectedKey) return false;
+    
+    if (selector && selectedKey) {
+      selector.value = selectedKey;
+    }
     
     // Check for unsaved changes before switching
     if (isDirty && selectedKey !== loadedTemplateName) {
       if (!confirm(`当前模板 [${loadedTemplateName || '未命名'}] 有未保存的修改，切换将丢失这些修改。确定要切换吗？`)) {
-        // Restore selector value to currently loaded template name
-        const selector = document.getElementById('templateSelector');
         if (selector) {
           selector.value = loadedTemplateName;
         }
@@ -1760,12 +1766,7 @@
       
       renderTiles();
       updateStats();
-      showToast(`已成功加载 ${selectedKey}！`, 'success');
-      
-      // Update workspace header title
       updateWorkspaceTitle();
-      
-      // Populate backside selector options
       populateBacksideSelector(selectedKey);
       
       // Sync active explorer list item
@@ -1786,6 +1787,8 @@
       } catch (e) {
         console.warn("Failed to update URL param", e);
       }
+      
+      showToast(`已成功加载 ${selectedKey}！`, 'success');
       return true;
     }
     return false;
@@ -1796,18 +1799,18 @@
     // Generate suggested next template ID
     let nextIdx = 1;
     sortedTemplateKeys.forEach(k => {
-      const num = parseInt(k.replace('template_', ''));
+      const num = parseInt((k.match(/\d+/) || [0])[0], 10);
       if (!isNaN(num) && num >= nextIdx) {
         nextIdx = num + 1;
       }
     });
     const defaultId = `template_${nextIdx}`;
     
-    const newKey = prompt(`请输入新建关卡模板的ID（必须以 'template_' 加上数字结尾）：`, defaultId);
+    const newKey = prompt(`请输入新建关卡模板的ID（如 template_101 或 wx_level_101）：`, defaultId);
     if (!newKey) return;
     
-    if (!/^template_\d+$/.test(newKey)) {
-      showToast("模板ID格式无效，必须以 'template_' 加上数字结尾（例如: template_101）！", "error");
+    if (!/^[a-zA-Z0-9_-]+$/.test(newKey)) {
+      showToast("模板ID格式无效，只允许包含字母、数字、下划线和连字符！", "error");
       return;
     }
     
@@ -2545,17 +2548,12 @@
       showToast(`保存成功，但检测到 ${errors.length} 项合规性警告，请留意！`, "warn");
     }
 
-    let selectedKey = document.getElementById('templateSelector').value;
-    
-    // Fallback to loadedTemplateName if select value got lost or was cleared
-    if (!selectedKey && loadedTemplateName) {
-      selectedKey = loadedTemplateName;
-    }
+    let selectedKey = loadedTemplateName || (document.getElementById('templateSelector') ? document.getElementById('templateSelector').value : '');
     
     if (!selectedKey) {
-      const newKey = prompt("请输入要新建/覆盖的模板ID（例如: template_1）：");
-      if (!newKey || !newKey.startsWith('template_')) {
-        showToast("模板ID格式无效，必须以 'template_' 开头！", "error");
+      const newKey = prompt("请输入要新建/覆盖的模板ID（例如: template_1 或 wx_level_1）：");
+      if (!newKey || !/^[a-zA-Z0-9_-]+$/.test(newKey)) {
+        showToast("模板ID格式无效，只允许使用字母、数字、下划线和连字符！", "error");
         return;
       }
       selectedKey = newKey;
@@ -2797,11 +2795,11 @@
         const selector = document.getElementById('templateSelector');
         if (selector) {
           selector.value = key;
-          const loaded = loadSelectedTemplate();
-          if (loaded) {
-            document.querySelectorAll('.explorer-item').forEach(el => el.classList.remove('active'));
-            item.classList.add('active');
-          }
+        }
+        const loaded = loadSelectedTemplate(key);
+        if (loaded) {
+          document.querySelectorAll('.explorer-item').forEach(el => el.classList.remove('active'));
+          item.classList.add('active');
         }
       };
       
