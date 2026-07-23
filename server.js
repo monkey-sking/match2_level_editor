@@ -140,9 +140,14 @@ const server = http.createServer((req, res) => {
     }
   }
 
-  // If path is a directory, try serving index.html
-  if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
-    filePath = path.join(filePath, 'index.html');
+  // If path is root '/', serve level_editor.html directly
+  if (urlPath === '/' || urlPath === '') {
+    filePath = path.join(ROOT, 'level_editor.html');
+  }
+  // If path is a directory, try serving level_editor.html then index.html
+  else if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+    const editorPath = path.join(filePath, 'level_editor.html');
+    filePath = fs.existsSync(editorPath) ? editorPath : path.join(filePath, 'index.html');
   }
 
   if (!fs.existsSync(filePath)) {

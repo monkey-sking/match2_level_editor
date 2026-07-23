@@ -23,6 +23,11 @@
     --color-l3: #0be881;
     --color-l4: #ffd32a;
     --color-l5: #ff3f34;
+    --color-l6: #ef5777;
+    --color-l7: #f53b57;
+    --color-l8: #00d8d6;
+    --color-l9: #3c40c6;
+    --color-l10: #05c46b;
   }
 
   * {
@@ -61,8 +66,8 @@
 
   .main-layout {
     display: grid;
-    grid-template-columns: 1fr 400px;
-    gap: 30px;
+    grid-template-columns: 280px 1fr 340px;
+    gap: 20px;
     flex-grow: 1;
   }
 
@@ -596,7 +601,9 @@
 
   /* Explorer list inside Left Sidebar */
   .explorer-dock {
-    height: 100%;
+    height: calc(100vh - 120px);
+    max-height: 850px;
+    min-height: 500px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -625,6 +632,7 @@
   
   .explorer-list {
     flex: 1;
+    max-height: calc(100vh - 220px);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -994,7 +1002,7 @@
   }
 </style>
 </head>
-<body>
+<body class="theme-modern">
 
 <div id="dataLoadWarning" style="display:none; background:#ff3f34; color:#fff; padding:10px 20px; font-size:13px; font-weight:bold; text-align:center; position:sticky; top:0; z-index:99999; box-shadow:0 2px 10px rgba(0,0,0,0.3); justify-content:center; align-items:center; gap:15px;">
   <span>⚠️ 自动加载 BoardTemplates.json 数据失败（可能是因为以本地文件形式打开）。请运行 start_server.bat 并在 http://localhost:8080/level_editor.html 中编辑，或在此处手动导入：</span>
@@ -1018,7 +1026,7 @@
 
 <div class="main-layout">
   <!-- 1. Left Explorer Sidebar (Modern Only) -->
-  <div class="explorer-dock card modern-only">
+  <div class="explorer-dock card">
     <div class="workspace-title" style="margin-bottom: 12px; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;">
       <div style="display: flex; flex-direction: column;">
         <span>关卡浏览器</span>
@@ -1035,6 +1043,11 @@
       </select>
       <select id="explorerModeFilter" onchange="onFilterChange()" style="flex: 1; padding: 6px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 12px; outline: none; cursor: pointer;">
         <option value="">全部模式</option>
+      </select>
+      <select id="explorerSortFilter" onchange="onFilterChange()" style="flex: 1; padding: 6px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 12px; outline: none; cursor: pointer;">
+        <option value="level">关卡顺序</option>
+        <option value="name">模板名称</option>
+        <option value="tiles">卡牌数量</option>
       </select>
     </div>
     <div class="explorer-list" id="explorerList">
@@ -1122,6 +1135,44 @@
 
   <!-- 3. Inspector Sidebar (Shared) -->
   <div class="inspector-sidebar card">
+
+      <!-- ==========================================================================
+           MAHJONG SOLVER & DIFFICULTY RATING PANEL
+           ========================================================================== -->
+      <div class="card control-group" style="background: rgba(255, 211, 42, 0.04) !important; border: 1px solid rgba(255, 211, 42, 0.2) !important; margin-bottom: 20px; border-radius: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+          <span style="font-family: 'Outfit', sans-serif; font-size: 15px; font-weight: 800; color: var(--accent);">📊 关卡难度实时评分</span>
+          <span id="diffScoreGrade" style="font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 4px; background: rgba(0,0,0,0.4); color: #0be881;">🟢 极简 / 割草解压</span>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px;">
+          <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+            <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">难度综合评分</div>
+            <div id="diffScoreVal" style="font-size: 20px; font-family: 'Outfit', sans-serif; font-weight: 800; color: var(--accent); margin-top: 2px;">18 / 100</div>
+          </div>
+          
+          <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); text-align: center;">
+            <div style="font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">自由牌占比</div>
+            <div id="diffFreeVal" style="font-size: 15px; font-family: 'Outfit', sans-serif; font-weight: 700; color: #4bcffa; margin-top: 4px;">24 张 (63.2%)</div>
+          </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+          <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 9px; color: var(--text-muted);">最高层高</div>
+            <div id="diffLayerVal" style="font-size: 12px; font-weight: bold; color: var(--text-main); margin-top: 2px;">2 层</div>
+          </div>
+          <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 9px; color: var(--text-muted);">拓扑瓶颈</div>
+            <div id="diffBottleneckVal" style="font-size: 12px; font-weight: bold; color: #0be881; margin-top: 2px;">0 个瓶颈</div>
+          </div>
+          <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 6px; text-align: center;">
+            <div style="font-size: 9px; color: var(--text-muted);">误判陷阱</div>
+            <div id="diffMisjudgeVal" style="font-size: 12px; font-weight: bold; color: #0be881; margin-top: 2px;">低</div>
+          </div>
+        </div>
+      </div>
+
     <div class="workspace-title classic-only">属性与操作面板</div>
     <div class="workspace-title modern-only" style="margin-bottom: 20px; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 800;">检查器与设置</div>
 
@@ -1379,13 +1430,18 @@
   }
 
   async function init() {
+    config = {
+      grid: { cols: 11, rows: 13, tileWidth: 2, tileHeight: 2 },
+      layers: { max: 5, colors: { 1: '#4bcf50', 2: '#45aaf2', 3: '#ff9f1a', 4: '#a55eea', 5: '#ff3f34' } }
+    };
     try {
       const res = await fetch('/data/config.json');
       if (res.ok) {
-        config = await res.json();
+        const loadedConfig = await res.json();
+        config = Object.assign(config, loadedConfig);
       }
     } catch (e) {
-      console.warn("Could not load config.json, using defaults", e);
+      console.warn("Could not load config.json, using fallback defaults", e);
     }
 
     cols = config.grid.cols;
@@ -1583,25 +1639,27 @@
         allLoadedTemplates = await response.json();
         const selector = document.getElementById('templateSelector');
         
-        // Clear previous options except first
-        selector.innerHTML = '<option value="">-- 选择模板 --</option>';
+        // Clear previous options except first (guard against null)
+        if (selector) {
+          selector.innerHTML = '<option value="">-- 选择模板 --</option>';
+        }
         
         sortedTemplateKeys = Object.keys(allLoadedTemplates)
-          .sort((a,b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
+          .sort((a, b) => (parseInt((a.match(/\d+/) || [0])[0], 10)) - (parseInt((b.match(/\d+/) || [0])[0], 10)));
           
-        sortedTemplateKeys.forEach(key => {
+        if (selector) {
+          sortedTemplateKeys.forEach(key => {
             const opt = document.createElement('option');
             opt.value = key;
             opt.textContent = `${key} (${allLoadedTemplates[key].length} 张牌)`;
             selector.appendChild(opt);
           });
           
-        if (loadedTemplateName && allLoadedTemplates[loadedTemplateName]) {
-          selector.value = loadedTemplateName;
+          if (loadedTemplateName && allLoadedTemplates[loadedTemplateName]) {
+            selector.value = loadedTemplateName;
+          }
         }
-        if (typeof rebuildExplorer === 'function') {
-          rebuildExplorer();
-        }
+        rebuildExplorer();
       } else {
         throw new Error('Response code ' + response.status);
       }
@@ -1631,7 +1689,7 @@
         selector.innerHTML = '<option value="">-- 选择模板 --</option>';
         
         sortedTemplateKeys = Object.keys(allLoadedTemplates)
-          .sort((a,b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
+          .sort((a, b) => (parseInt((a.match(/\d+/) || [0])[0], 10)) - (parseInt((b.match(/\d+/) || [0])[0], 10)));
           
         sortedTemplateKeys.forEach(key => {
           const opt = document.createElement('option');
@@ -1767,7 +1825,7 @@
     // Create new template entry
     allLoadedTemplates[newKey] = [];
     sortedTemplateKeys = Object.keys(allLoadedTemplates)
-      .sort((a,b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
+      .sort((a, b) => (parseInt((a.match(/\d+/) || [0])[0], 10)) - (parseInt((b.match(/\d+/) || [0])[0], 10)));
       
     // Rebuild select options
     const selector = document.getElementById('templateSelector');
@@ -2230,6 +2288,7 @@
 
   // Perform checks and update stats block
   function updateStats() {
+    if (typeof updateDifficultyUI === "function") { updateDifficultyUI(activeTiles); }
     const tileCount = activeTiles.length;
     document.getElementById('statTileCount').textContent = `${tileCount} 张`;
     
@@ -2668,13 +2727,58 @@
     const searchVal = document.getElementById('explorerSearch') ? document.getElementById('explorerSearch').value.toLowerCase() : "";
     const selProj = document.getElementById('explorerProjectFilter') ? document.getElementById('explorerProjectFilter').value : "";
     const selMode = document.getElementById('explorerModeFilter') ? document.getElementById('explorerModeFilter').value : "";
+    const sortVal = document.getElementById('explorerSortFilter') ? document.getElementById('explorerSortFilter').value : "level";
     
-    sortedTemplateKeys.forEach(key => {
+    // Helper: calculate min game level for template
+    function getMinLevel(key) {
+      const usages = templateUsages[key] || [];
+      let minLvl = 999999;
+      usages.forEach(u => {
+        if (selProj && u.project !== selProj) return;
+        if (selMode && u.mode !== selMode) return;
+        (u.levels || []).forEach(l => {
+          const lvlId = typeof l === 'object' ? l.id : l;
+          const num = parseInt(lvlId, 10);
+          if (!isNaN(num) && num < minLvl) {
+            minLvl = num;
+          }
+        });
+      });
+      return minLvl;
+    }
+
+    const displayKeys = [...sortedTemplateKeys];
+
+    if (sortVal === 'level') {
+      displayKeys.sort((a, b) => {
+        const minA = getMinLevel(a);
+        const minB = getMinLevel(b);
+        if (minA !== minB) return minA - minB;
+        const numA = parseInt((a.match(/\d+/) || [0])[0], 10);
+        const numB = parseInt((b.match(/\d+/) || [0])[0], 10);
+        return numA - numB;
+      });
+    } else if (sortVal === 'tiles') {
+      displayKeys.sort((a, b) => {
+        const countA = (allLoadedTemplates[a] || []).length;
+        const countB = (allLoadedTemplates[b] || []).length;
+        return countA - countB;
+      });
+    } else {
+      displayKeys.sort((a, b) => {
+        const numA = parseInt((a.match(/\d+/) || [0])[0], 10);
+        const numB = parseInt((b.match(/\d+/) || [0])[0], 10);
+        return numA - numB;
+      });
+    }
+
+    displayKeys.forEach(key => {
       if (searchVal && !key.toLowerCase().includes(searchVal)) return;
       
       const tiles = allLoadedTemplates[key];
       const validity = checkTemplateValidity(tiles);
       const usages = templateUsages[key] || [];
+      const minLvl = getMinLevel(key);
       
       const filteredUsages = usages.filter(u => {
         if (selProj && u.project !== selProj) return false;
@@ -2716,12 +2820,19 @@
         usageHtml = `<div style="font-size:9px; color:var(--text-muted); margin-top:4px; font-style:italic;">未使用</div>`;
       }
       
+      const levelBadge = minLvl < 999999 ? 
+        `<span style="background: linear-gradient(135deg, #ff9f1a, #ff3f34); color:#fff; font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; box-shadow: 0 1px 3px rgba(255,63,52,0.3);">第 ${minLvl} 关</span>` :
+        `<span style="color:var(--text-muted); font-size:10px; font-style:italic;">未配关</span>`;
+
       item.style.flexDirection = 'column';
       item.style.alignItems = 'stretch';
       
       item.innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-          <div class="explorer-item-name" style="font-weight:bold;">${key}</div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            ${levelBadge}
+            <div class="explorer-item-name" style="font-weight:bold; font-size:12px;">${key}</div>
+          </div>
           <div class="explorer-item-meta">
             <span class="explorer-item-count">${tiles ? tiles.length : 0}张</span>
             <span class="explorer-item-status ${statusClass}">${validity.msg}</span>
@@ -2926,6 +3037,138 @@
     
     renderTiles();
   }
+
+
+// ==========================================================================
+// MAHJONG SOLVER ENGINE & LIVE DIFFICULTY RATING SYSTEM
+// ==========================================================================
+const MahjongSolverEngine = {
+  isOverlapping: function(t1, t2) {
+    return Math.abs(t1.x - t2.x) < 2 && Math.abs(t1.y - t2.y) < 2;
+  },
+  
+  buildDependencyGraph: function(tiles) {
+    const dependencies = new Map();
+    for (let i = 0; i < tiles.length; i++) {
+      const blockers = new Set();
+      for (let j = 0; j < tiles.length; j++) {
+        if (i === j) continue;
+        const l1 = tiles[i].layout || tiles[i].layer || 1;
+        const l2 = tiles[j].layout || tiles[j].layer || 1;
+        if (l2 > l1 && this.isOverlapping(tiles[i], tiles[j])) {
+          blockers.add(j);
+        }
+      }
+      dependencies.set(i, blockers);
+    }
+    return dependencies;
+  },
+  
+  findFreeTiles: function(tiles, dependencies) {
+    const free = [];
+    for (let i = 0; i < tiles.length; i++) {
+      if (dependencies.get(i).size === 0) {
+        free.push(i);
+      }
+    }
+    return free;
+  },
+  
+  analyzeDifficulty: function(tiles) {
+    if (!tiles || tiles.length === 0) {
+      return {
+        score: 0,
+        grade: "🟢 空棋盘",
+        gradeColor: "#8e8e9f",
+        freeCount: 0,
+        freeRatio: "0%",
+        maxLayer: 0,
+        bottlenecks: 0,
+        misjudgePressure: "无"
+      };
+    }
+    
+    const deps = this.buildDependencyGraph(tiles);
+    const free = this.findFreeTiles(tiles, deps);
+    
+    const totalCount = tiles.length;
+    const freeCount = free.length;
+    const freeRatioVal = totalCount > 0 ? (freeCount / totalCount) : 1.0;
+    const freeRatioPct = (freeRatioVal * 100).toFixed(1) + "%";
+    
+    let maxLayer = 1;
+    for (let t of tiles) {
+      const l = t.layout || t.layer || 1;
+      if (l > maxLayer) maxLayer = l;
+    }
+    
+    let bottlenecks = 0;
+    deps.forEach((blockers) => {
+      if (blockers.size >= 3) bottlenecks++;
+    });
+    
+    // User-Calibrated Weighting:
+    const ratioScore = (1.0 - freeRatioVal) * 45.0;
+    const bottleneckScore = Math.min(35.0, (bottlenecks / Math.max(1, totalCount)) * 70.0);
+    const layerScore = Math.min(10.0, (maxLayer - 1) * 2.5);
+    const scaleScore = Math.min(10.0, (totalCount / 120.0) * 10.0);
+    
+    let score = Math.max(5, Math.min(99, Math.round(ratioScore + bottleneckScore + layerScore + scaleScore)));
+    
+    let grade = "🟢 极简 / 割草解压";
+    let gradeColor = "#0be881";
+    if (score > 65) {
+      grade = "🔴 极难 / 变现卡点";
+      gradeColor = "#ff3f34";
+    } else if (score > 45) {
+      grade = "🟠 困难 / 商业化挑战";
+      gradeColor = "#ff9f1a";
+    } else if (score > 25) {
+      grade = "🟡 适中 / 进阶思考";
+      gradeColor = "#ffd32a";
+    }
+    
+    let misjudge = "低 (无陷阱)";
+    if (bottlenecks > 3) misjudge = "高 (易卡手)";
+    else if (bottlenecks > 0) misjudge = "中 (局部思考)";
+    
+    return {
+      score: score,
+      grade: grade,
+      gradeColor: gradeColor,
+      freeCount: freeCount,
+      freeRatio: freeRatioPct,
+      maxLayer: maxLayer,
+      bottlenecks: bottlenecks,
+      misjudgePressure: misjudge
+    };
+  }
+};
+
+function updateDifficultyUI() {
+  const currentTiles = (typeof activeTiles !== 'undefined' && activeTiles) ? activeTiles : [];
+  const analysis = MahjongSolverEngine.analyzeDifficulty(currentTiles);
+  
+  const scoreVal = document.getElementById('diffScoreVal');
+  const scoreGrade = document.getElementById('diffScoreGrade');
+  const freeVal = document.getElementById('diffFreeVal');
+  const layerVal = document.getElementById('diffLayerVal');
+  const bottleneckVal = document.getElementById('diffBottleneckVal');
+  const misjudgeVal = document.getElementById('diffMisjudgeVal');
+  
+  if (scoreVal) scoreVal.textContent = analysis.score + " / 100";
+  if (scoreGrade) {
+    scoreGrade.textContent = analysis.grade;
+    scoreGrade.style.color = analysis.gradeColor;
+  }
+  if (freeVal) freeVal.textContent = `${analysis.freeCount} 张 (${analysis.freeRatio})`;
+  if (layerVal) layerVal.textContent = `${analysis.maxLayer} 层`;
+  if (bottleneckVal) bottleneckVal.textContent = `${analysis.bottlenecks} 个瓶颈`;
+  if (misjudgeVal) misjudgeVal.textContent = analysis.misjudgePressure;
+}
+
+// Automatic 300ms fallback timer to guarantee UI refresh
+setInterval(updateDifficultyUI, 300);
+
 </script>
-</body>
-</html>
+
