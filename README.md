@@ -1,5 +1,9 @@
 # Match-2 Level Editor (二消关卡排版编辑器)
 
+<!-- badges:start -->
+[![License](https://img.shields.io/github/license/monkey-sking/match2_level_editor?style=flat-square)](https://github.com/monkey-sking/match2_level_editor/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/monkey-sking/match2_level_editor?style=flat-square)](https://github.com/monkey-sking/match2_level_editor/commits/main) [![HTML](https://img.shields.io/github/languages/top/monkey-sking/match2_level_editor?style=flat-square)](https://github.com/monkey-sking/match2_level_editor/search?l=HTML) [![views](https://hits.sh/github.com/monkey-sking/match2_level_editor.svg?style=flat-square&label=views&color=0e75b6)](https://github.com/monkey-sking/match2_level_editor)
+<!-- badges:end -->
+
 [English](#english) | [中文说明](#中文说明)
 
 ---
